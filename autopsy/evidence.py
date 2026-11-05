@@ -24,6 +24,8 @@ def normalize_company(company, result):
     def add(category,fact,value,event_date=None,suffix=''):
         evidence.append(Evidence(company_id=cid,category=category,fact=fact,value=value,
             source=source+suffix,event_date=valid_date(event_date),retrieved_at=result['retrieved_at']))
+    if company.get('basic_info'):
+        add('identity','Resolved company identity and provider metadata',company['basic_info'])
     for section,key,category in [('headcount','employee_count','workforce'),('hiring','open_jobs','hiring')]:
         obj=company.get(section) or {}
         rows=obj.get('timeseries' if section=='headcount' else 'open_jobs_timeseries') or []
@@ -35,6 +37,8 @@ def normalize_company(company, result):
         if number(current):
             add(category+'_snapshot','Current provider snapshot (effective date unknown)',current,suffix='/'+section)
     funding=company.get('funding') or {}
+    if funding:
+        add('funding_snapshot','Provider funding summary; funding silence does not establish a cash shortage',funding, suffix='/funding')
     for row in funding.get('milestones') or []:
         if isinstance(row,dict):
             add('funding','Provider funding milestone',row,row.get('funding_date') or row.get('date'),'/funding')

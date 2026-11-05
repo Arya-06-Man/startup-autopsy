@@ -156,7 +156,9 @@ with timeline:
         if name!='All companies' and name!=(d.name or d.query): continue
         items=sorted([e for e in d.evidence if e.category in chosen],key=lambda e:e.event_date or e.publication_date or e.retrieved_at,reverse=True)
         st.markdown('### '+(d.name or d.query))
-        for e in items:
+        total_pages=max(1,(len(items)+24)//25)
+        page=st.number_input(f'Evidence page · {d.name or d.query} ({len(items)} observations)',min_value=1,max_value=total_pages,value=1,key='page_'+run.id+d.query)
+        for e in items[(page-1)*25:page*25]:
             with st.expander(f'{e.event_date or e.publication_date or "Undated"} · {e.category} · {e.fact[:100]} · {e.id}'):
                 st.write(e.fact); st.caption(f'{e.status} · {e.provider} · Retrieved {e.retrieved_at}')
                 if safe_url(e.source): st.link_button('Open source / API reference',e.source)

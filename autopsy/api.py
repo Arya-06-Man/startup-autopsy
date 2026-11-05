@@ -41,7 +41,7 @@ class Crustdata:
         if self.stopped:
             raise ResearchError('API halted after authentication or credit failure.')
         for attempt in range(3):
-            if self.calls >= self.settings.max_calls or self.estimated_credits + estimate > self.settings.max_credits:
+            if self.calls >= self.settings.max_calls or max(self.estimated_credits, self.actual_credits) + estimate > self.settings.max_credits:
                 raise ResearchError('Investigation budget reached. Increase the call or credit limit for a new run.')
             # 10/min web, conservative 30/min other endpoints, including retries.
             interval = 6.1 if path.startswith('/web/') else 2.1

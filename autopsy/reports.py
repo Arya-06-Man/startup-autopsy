@@ -1,5 +1,7 @@
 import json
-from jinja2 import Environment, select_autoescape
+from pathlib import Path
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from autopsy.evidence import safe_url
 from autopsy.evidence import validate_refs
 
 DISCLAIMER='Investigation priorities are heuristic monitoring aids, not probabilities of failure. Missing evidence is not evidence of safety. Hiring changes and funding silence do not establish financial distress.'
@@ -42,6 +44,11 @@ def markdown(run):
 
 
 def html(run):
-    # Escaping is mandatory: provider/LLM content never executes as HTML.
-    template=Environment(autoescape=select_autoescape(default=True)).from_string('''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Startup Autopsy · Investor Briefing</title><style>body{background:#0b1019;color:#e8edf5;font:16px/1.65 system-ui;max-width:1100px;margin:48px auto;padding:24px}h1{letter-spacing:.12em;color:#58dac2}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#121c2a;padding:24px;border-radius:12px}@media print{body{background:white;color:black}pre{background:#f4f4f4}}</style><h1>STARTUP AUTOPSY</h1><p>Investor monitoring briefing · {{ timestamp }}</p><pre>{{ report }}</pre></html>''')
-    return template.render(timestamp=run.created_at,report=markdown(run))
+    validate(run)
+    env=Environment(loader=FileSystemLoader(Path(__file__).parent),autoescape=select_autoescape(['html']))
+    companies=sorted(run.companies,key=lambda d:d.assessment.score if d.assessment.score is not None else -1,reverse=True)
+    return env.get_template('briefing.html').render(run=run,companies=companies,disclaimer=DISCLAIMER,
+        urgent=sum(d.assessment.label=='Urgent review' for d in companies),
+        inconclusive=sum(d.assessment.score is None for d in companies),safe_url=safe_url,
+        values={e.id:json.dumps(e.value,ensure_ascii=False,indent=2) for d in companies for e in d.evidence},
+        usage=json.dumps(run.usage,indent=2))
