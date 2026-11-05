@@ -1,69 +1,61 @@
-# Two-minute VCOS demo
+# Two-minute VCOS demonstration
 
-This is a recording script, not a claim that a video was recorded. Browser connection was unavailable during implementation.
+This is a ready-to-read script and recording procedure. No video or browser visual review was performed by the agent: the browser connection was unavailable. The repository is public; the submitting team must verify the official deadline and upload the actual video.
 
-## 0:00–0:20 — Investor mandate
+## Prepare before recording
 
-“I have capital, constraints and competing deals. Startup Autopsy turns company intelligence into auditable investment work.” In Overview enter the ₹10 crore Indian B2B SaaS example, draft constraints, review the guided/advanced fields, and save. Show the explicit follow-on reserve and deployable capital.
+1. Start `.venv/bin/streamlit run app.py --server.address 127.0.0.1 --server.port 8501` and open http://127.0.0.1:8501.
+2. Check provider access once: `--check retool.com`, `--check-discovery IND`, and `--check-llm` via `.venv/bin/python -m autopsy.cli`. These make actual calls; do not loop diagnostics. Gemini `gemini-3.5-flash` and the Retool/Razorpay pair were validated during final QA.
+3. Keep the completed two-company investigation selected in the sidebar. Reopening its saved dossier is an archived real investigation, not a fresh live call. Show the actual retrieval time and mode. Leave Refresh off for the recording unless you intend to spend credits on a fresh investigation.
+4. Prepare an open-sector/open-geography mandate: INR 100,000,000 total capital, Moderate risk, five years, 30% reserve, 25% company limit, 50% sector limit. That leaves INR 70,000,000 before existing holdings and liquidity. Narrower preferences may legitimately exclude a company.
+5. For each company, illustrative ordinary-equity terms may use INR 20,000,000 proposed cheque, INR 80,000,000 pre-money and INR 20,000,000 total round. Select **MODELED ASSUMPTIONS**. The implied ownership is 20%. These numbers are not either company's real valuation or funding terms. Leave company cash, revenue, financial date and document attestations missing unless real records were supplied.
+6. The correct result with missing company financials is MORE DILIGENCE REQUIRED and no investment. Do not mark documents verified or invent financial statements to produce an allocation. The positive INR 40m → INR 20m allocation path is covered by the isolated synthetic AppTest, not claimed as a real-company investment recommendation.
+7. Prepare a separate hypothetical War Room: cash INR 100m, monthly net burn INR 1m, five years, investor cost INR 20m, 20% ownership, exit assumptions downside INR 50m / base INR 200m / upside INR 500m. Clearly state these are hypothetical operating assumptions, not company cash balances. The base survives the horizon and has 2x MOIC. Increasing burn to INR 2m exhausts cash in month 50 and produces zero recovery under the stated model.
+8. Run the committee before recording if you need a reliable two-minute presentation. Show its actual engine, model and result; generation can still encounter overload and must visibly fall back. A saved memo's recorded generation is not a new live response.
 
-## 0:20–0:40 — Discover and investigate
+## Record precisely
 
-In Discover, search with `IND` plus an exact documented industry if needed. Explain why the companies match and why index observations are not investment recommendations. Select two domains and launch bounded diligence, or reopen a previously completed real investigation with its original retrieval date. Do not imply cached data is a new live call.
+- On macOS press Shift–Command–5, select the browser/window region, enable the microphone in Options and start recording. Use a readable desktop viewport around 1440 × 900; check text and tables visually first.
+- Keep `.env`, terminal history, private financial files and unrelated tabs off-screen. Do not publish raw provider exports without checking licensing.
+- Follow the script below; stop at or before 2:00. Preview the video with audio, confirm the playback link works without private-account permissions, then put that actual link in the submission form.
+- Public repo: https://github.com/Arya-06-Man/startup-autopsy. Public architecture: https://github.com/Arya-06-Man/startup-autopsy/blob/main/docs/ARCHITECTURE.md. Confirm the handbook's deadline/timezone and submission destination manually; neither is guessed here.
 
-## 0:40–1:00 — Compare and question
+## 0:00–0:20 — Mandate
 
-In Evaluate select two investigated companies and enter **actual supplied** terms and dated financials with the guided editor. If no real financials are available, leave them missing and show “MORE DILIGENCE REQUIRED.” Never invent real-company valuations for presentation. Show ownership, valuation/revenue where supplied, source coverage and missing documents side by side.
+“Startup Autopsy replaces the analyst workflow between company intelligence and an investment committee decision. Here is a ten-crore mandate with a thirty-percent follow-on reserve and hard exposure limits. Seven crore remains available before other holdings or liquidity needs.”
 
-## 1:00–1:20 — War Room and allocation
+Show Overview, the reviewed constraints and Save reviewed mandate. Never silently loosen a limit to make a deal pass.
 
-Use explicitly described user assumptions for cash, burn, funding timing and exit values. Run the scenario comparison, show delayed financing/capital loss and assumptions. In Portfolio Lab compute conditional allocations and alternatives. A zero-investment result is a valid decision; show which hard constraint or missing fact prevents deployment.
+## 0:20–0:40 — Discovery and diligence
 
-## 1:20–1:45 — Challenge and replay
+“Discovery queries Crustdata's actual index. The filters explain why each company appeared. We shortlist candidates instead of enriching every search result. Here are two completed real investigations with their original source dates.”
 
-Run committee challenge. State which engine actually responded; current live Gemini generation has not been validated, so show deterministic fallback honestly if it persists. Three AI role passes are one provider, not independent experts. Save a decision, change a supplied assumption, recompute and compare actual snapshot differences.
+Show Discover, the real results table and Add selected to evaluation. Switch to the prepared Retool/Razorpay evidence context. Label archived/cached results accurately.
 
-## 1:45–2:00 — Deliver the service
+## 0:40–1:00 — Comparison
 
-Download the HTML committee memo and JSON audit record. Open Evidence & Reports to show a finding's original evidence IDs and separate source dates. “No transaction, fabricated financial or founder outreach. The output is a reviewed work product with explicit approval conditions.” State the executed test count from README.
+“These entry terms are illustrative modeled assumptions. Ordinary-equity ownership is calculated deterministically. Company financial statements remain unknown, so both deals require more diligence.”
 
-## Longer investigation walkthrough
+Show Evaluate, the side-by-side table, 20% ownership where using the prepared example, source coverage, financial unknowns and deal breakers.
 
-## Before presenting
+## 1:00–1:25 — Allocate and stress
 
-1. Create `.env` with a valid Crustdata key. Optionally add Gemini; never show the file or terminal history containing keys.
-2. Run `.venv/bin/python -m autopsy.cli --check retool.com` to verify Python runtime credentials.
-3. Start `.venv/bin/streamlit run app.py` and launch a single company investigation. Check endpoint access and credits before using a larger portfolio.
-4. Keep the completed real run in the archive. Label it cached when reopened. Do not claim cached replay is a new live request.
-5. Download the HTML briefing and JSON ledger. Review observations, dates, limitations and any failed fetches before presenting.
+“The allocator respects capital, reserves and concentration. It can keep all capital uninvested. In this hypothetical War Room, increasing burn changes the cash path immediately; financing after exhaustion does not rescue the modeled company.”
 
-## 0:00 — The analyst service being replaced
+Show Portfolio Lab's actual no-investment explanation. In War Room change burn from INR 1m to INR 2m, show month-50 exhaustion, zero-recovery output and the updated assumptions. Applying outcomes to a deal requires matched ownership/cost basis and an explicit confirmation; missing financial evidence still blocks approval.
 
-“Portfolio monitoring means resolving companies, checking changing operating signals, investigating explanations, reconciling sources, and producing an investor follow-up. Startup Autopsy performs that workflow and saves the result.”
+## 1:25–1:45 — Challenge and replay
 
-## 0:30 — Launch investigation
+“One verified provider runs growth, skeptical-risk and portfolio-manager passes. These are cited AI hypotheses, not independent external experts. Changing an assumption invalidates old recommendations; replay shows the exact changed field and preserves the prior decision.”
 
-Paste one to three actual primary domains or upload `samples/portfolio.csv`. Show the budget controls and start the investigation. Explain each displayed stage as actual API work runs. A slow or failed source is visible; don't hide it.
+Show the actual Gemini/fallback status, cited arguments and approval conditions. Save/reopen a prepared decision snapshot and show its real differences.
 
-## 1:30 — Explain the decisions
+## 1:45–2:00 — Deliver
 
-Open a company dossier. Show the decision trail: which observation or evidence gap caused the next research call. Explain that Gemini is optional and cannot invent tool results or alter deterministic scores. If no real anomaly exists, explain the coverage gap and resulting targeted research rather than inventing a finding.
+“The output is a decision memo with the mandate, terms, modeled outcomes, opposing arguments, evidence and missing diligence. No trade or founder outreach is executed.”
 
-## 2:15 — Inspect the evidence
+Download/open HTML, Markdown or JSON. Show the executive summary and source dates. State the current executed test count from README; final QA recorded 122 passing offline tests plus separate real-provider checks.
 
-Open a trend's exact evidence IDs in the timeline. Show event dates, retrieval dates, source/API references and original values. Contrast single-provider observations, unverified search leads, and fetched documents. State that none is automatically independently corroborated.
+## Submission gate
 
-## 3:00 — Assess with restraint
-
-Show the formula and observed-category coverage. Explain missing leadership/business data, alternate explanations, and why some companies are unscored. Hiring reductions do not establish financial distress; funding silence does not imply a cash shortage.
-
-## 3:45 — Deliver the service
-
-Open investor actions: urgency, evidence to request, founder questions and draft email. No email is sent. Download the HTML briefing and JSON evidence ledger to show a finished work product.
-
-## 4:30 — Robustness and honest boundaries
-
-Reopen an archived investigation. Explain partial results, API errors, budget stops, cached timestamps and LLM fallback. Mention the executed test count and remaining live integration/visual QA gates truthfully.
-
-## If live calls are unavailable
-
-Show a previously completed real run and its original retrieval timestamp. Say “cached real investigation,” explain the connection error, and show that existing results remain usable. If no real run exists, demonstrate input validation and the test results; do not relabel synthetic fixtures as company intelligence.
+Technical workflow: validated. Visual presentation review and actual video upload: pending human execution. A working application is not a claim that the competition submission or video has been completed.

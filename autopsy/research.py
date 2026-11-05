@@ -16,7 +16,7 @@ class TextParser(HTMLParser):
         if not self.hidden: self.parts.append(data)
 
 
-def gather(api,dossier):
+def gather(api,dossier,seen=None):
     company,result,method=identify_company(api,dossier.query,dossier.metadata.get('identity_selection'))
     dossier.company_id=str(company['crustdata_company_id'])
     dossier.metadata=dict(company.get('basic_info') or {})
@@ -24,6 +24,7 @@ def gather(api,dossier):
     dossier.name=dossier.metadata.get('name',dossier.query)
     dossier.domain=dossier.metadata.get('primary_domain','')
     dossier.evidence.extend(normalize_company(company,result))
+    if seen and dossier.company_id in seen: return
     result=api.enrich(dossier.company_id,['basic_info','headcount.total','headcount.timeseries','hiring.openings_count','hiring.open_jobs_timeseries','funding','people.founders','people.cxos','news','updated_at'])
     from autopsy.api import candidates
     enriched_rows=[c for c in candidates(result['data']) if str(c['crustdata_company_id'])==dossier.company_id]

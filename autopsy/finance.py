@@ -2,7 +2,18 @@
 from typing import Literal
 from datetime import date
 from pydantic import Field, model_validator
-from autopsy.mandate import Validated
+from autopsy.mandate import Validated,category_key,country_key
+import math
+
+
+def finite_outputs(value):
+    if isinstance(value,dict):
+        for item in value.values(): finite_outputs(item)
+    elif isinstance(value,list):
+        for item in value: finite_outputs(item)
+    elif isinstance(value,float) and not math.isfinite(value):
+        raise ValueError('Calculation overflow: reduce the magnitude of the supplied assumptions.')
+    return value
 
 
 class Deal(Validated):
@@ -18,7 +29,7 @@ class Deal(Validated):
     round_size: float | None = Field(default=None, gt=0)
     instrument: Literal['Ordinary equity','Preferred shares','SAFE','Convertible note'] = 'Ordinary equity'
     cash: float | None = Field(default=None, ge=0)
-    monthly_burn: float | None = Field(default=None, gt=0)
+    monthly_burn: float | None = Field(default=None, ge=0)
     revenue: float | None = Field(default=None, ge=0)
     prior_revenue: float | None = Field(default=None, gt=0)
     gross_profit: float | None = None
@@ -30,7 +41,7 @@ class Deal(Validated):
     downside_moic: float | None = Field(default=None, ge=0)
     base_moic: float | None = Field(default=None, ge=0)
     upside_moic: float | None = Field(default=None, ge=0)
-    provenance: Literal['USER-PROVIDED DATA','SYNTHETIC DEMO DATA'] = 'USER-PROVIDED DATA'
+    provenance: Literal['USER-PROVIDED DATA','MODELED ASSUMPTIONS','SYNTHETIC DEMO DATA'] = 'USER-PROVIDED DATA'
 
     @model_validator(mode='after')
     def terms(self):
@@ -49,30 +60,33 @@ def deal_metrics(deal):
     supported = deal.instrument=='Ordinary equity'
     round_total = deal.round_size if deal.round_size is not None else deal.investment
     post = deal.valuation + round_total if deal.valuation_basis=='pre-money' else deal.valuation
-    return {
+    return finite_outputs({
         'post_money':post if supported else None,
         'ownership':deal.investment/post if supported else None,
         'valuation_revenue_multiple':post/deal.revenue if supported and deal.revenue else None,
         'runway_months':deal.cash/deal.monthly_burn if deal.cash is not None and deal.monthly_burn else None,
-        'revenue_growth':deal.revenue/deal.prior_revenue-1 if deal.revenue and deal.prior_revenue else None,
+        'revenue_growth':deal.revenue/deal.prior_revenue-1 if deal.revenue is not None and deal.prior_revenue else None,
         'gross_margin':deal.gross_profit/deal.revenue if deal.gross_profit is not None and deal.revenue else None,
         'operating_margin':deal.operating_profit/deal.revenue if deal.operating_profit is not None and deal.revenue else None,
-        'assumptions':['USER-PROVIDED DATA; financials unverified.',
+        'assumptions':[deal.provenance+'; financials unverified.',
+                       'Zero net burn has no finite baseline depletion runway.' if deal.monthly_burn==0 else 'Runway assumes constant positive monthly net burn.',
                        'Unknown round size assumes investor is the only new capital; confirm before approval.' if deal.round_size is None else 'Supplied round size includes investor cheque.',
-                       'Ordinary equity only; no preferences, fees, taxes, option pool or convertibles in entry math.' if supported else 'Instrument requires legal conversion/payout terms; ordinary-equity calculations withheld.']}
+                       'Ordinary equity only; no preferences, fees, taxes, option pool or convertibles in entry math.' if supported else 'Instrument requires legal conversion/payout terms; ordinary-equity calculations withheld.']})
 
 
 def readiness(mandate, deal, dossier=None):
     outside, missing, warnings = [], [], []
     for label, allowed, actual in [('sector',mandate.sectors,deal.sector),('stage',mandate.stages,deal.stage),('geography',mandate.geographies,deal.geography)]:
         if not actual: missing.append(f'Confirm {label}')
-        elif allowed and actual.casefold() not in [s.casefold() for s in allowed]: outside.append(f'{label} outside mandate')
+        elif allowed:
+            key=country_key if label=='geography' else category_key
+            if key(actual) not in [key(s) for s in allowed]: outside.append(f'{label} outside mandate')
     if deal.currency != mandate.currency: outside.append('Currency differs; no implicit FX conversion')
     if not mandate.min_cheque <= deal.investment <= mandate.max_cheque: outside.append('Cheque outside limits')
-    existing = sum(h.amount for h in mandate.existing if h.company_id==deal.company_id)
+    existing = sum(h.amount for h in mandate.existing if category_key(h.company_id)==category_key(deal.company_id))
     if existing+deal.investment > mandate.capital*mandate.company_limit: outside.append('Company concentration limit')
     for category, limit in [('sector',mandate.sector_limit),('stage',mandate.stage_limit)]:
-        exposure=sum(h.amount for h in mandate.existing if getattr(h,category)==getattr(deal,category))
+        exposure=sum(h.amount for h in mandate.existing if category_key(getattr(h,category))==category_key(getattr(deal,category)))
         if exposure+deal.investment > mandate.capital*limit: outside.append(category+' concentration limit')
     if deal.investment > mandate.deployable: outside.append('Insufficient deployable capital after reserve')
     if not deal.investment: missing.append('Positive proposed investment')
@@ -137,11 +151,11 @@ def simulate(scenario):
     ownership=s.ownership*(1-s.dilution) if funded else s.ownership
     proceeds=0 if exhaustion is not None else ownership*s.exit_value
     moic=proceeds/s.invested if s.invested else None
-    return {'baseline_runway_months':s.cash/s.monthly_burn if s.monthly_burn else None,
+    return finite_outputs({'baseline_runway_months':s.cash/s.monthly_burn if s.monthly_burn else None,
             'cash_exhaustion_month':exhaustion,'financing_received':funded,'ending_ownership':ownership,
             'exit_proceeds':proceeds,'moic':moic,'annualized_return':moic**(1/s.years)-1 if moic is not None else None,
             'trajectory':trajectory,'assumptions':s.model_dump(),
-            'limitations':'MODELED ASSUMPTIONS, not a forecast. Revenue change passes fully to net cash flow; fixed baseline net burn. Exhaustion implies zero recovery. Ordinary equity, no preferences, fees or taxes.'}
+            'limitations':'MODELED ASSUMPTIONS, not a forecast. Revenue change passes fully to net cash flow; fixed baseline net burn. Exhaustion implies zero recovery. Ordinary equity, no preferences, fees or taxes.'})
 
 
 def financing_round(ownership, pre_money, financing, follow_on=0., option_pool_fraction=0.):
@@ -153,7 +167,7 @@ def financing_round(ownership, pre_money, financing, follow_on=0., option_pool_f
     after=(ownership*pre_money+follow_on)/(pre_money+financing)*(1-option_pool_fraction)
     pro_rata=ownership*financing
     required=ownership*((pre_money+financing)/(1-option_pool_fraction)-pre_money)
-    return {'ownership_before':ownership,'ownership_after':after,'dilution_points':ownership-after,
+    return finite_outputs({'ownership_before':ownership,'ownership_after':after,'dilution_points':ownership-after,
             'pro_rata_capital_before_pool':pro_rata,'capital_to_maintain_after_pool':required,
             'maintain_feasible':required<=financing,
-            'limitations':'Ordinary equity only. New pool issued after financing. No SAFEs, notes, liquidation preferences, participation rights, fees or taxes.'}
+            'limitations':'Ordinary equity only. New pool issued after financing. No SAFEs, notes, liquidation preferences, participation rights, fees or taxes.'})

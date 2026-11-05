@@ -1,5 +1,6 @@
 """Heuristic investigation priority; never a failure probability."""
 from datetime import date, timedelta
+import math
 from autopsy.models import Assessment, Signal
 from autopsy.evidence import number, valid_date
 
@@ -23,6 +24,7 @@ def trend(evidence, category, as_of=None):
     if not baselines: return None
     prior=min(baselines,key=lambda e:abs((date.fromisoformat(metric_date(e))-target).days))
     change=(latest.value-prior.value)/prior.value*100
+    if not math.isfinite(change): return None
     # -30% workforce or -50% hiring saturates category priority.
     scale=30 if category=='workforce' else 50
     severity=min(100,max(0,-change/scale*100))
@@ -33,7 +35,7 @@ def trend(evidence, category, as_of=None):
 
 def assess(evidence, weights=None, as_of=None):
     weights=weights or WEIGHTS
-    if set(weights)!=set(WEIGHTS) or any(v<0 for v in weights.values()) or abs(sum(weights.values())-1)>.001:
+    if set(weights)!=set(WEIGHTS) or any(not math.isfinite(v) or v<0 for v in weights.values()) or abs(sum(weights.values())-1)>.001:
         raise ValueError('Risk weights must cover all four categories and sum to one.')
     signals=[s for c in ('workforce','hiring') if (s:=trend(evidence,c,as_of)) is not None]
     covered={s.category for s in signals}
@@ -48,4 +50,6 @@ def assess(evidence, weights=None, as_of=None):
 def runway(cash,monthly_burn,as_of):
     if not number(cash) or not number(monthly_burn) or monthly_burn<=0 or not valid_date(as_of) or date.fromisoformat(valid_date(as_of))>date.today():
         raise ValueError('Supply nonnegative cash, positive monthly net burn, and a valid non-future financial date.')
-    return cash/monthly_burn
+    value=cash/monthly_burn
+    if not math.isfinite(value): raise ValueError('Runway calculation overflow; check supplied inputs.')
+    return value

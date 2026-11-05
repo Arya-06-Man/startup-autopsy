@@ -1,5 +1,6 @@
 """Verified 2025-11-01 indexed Company Search contract, credit-bounded pages."""
 from autopsy.api import ResearchError
+from autopsy.mandate import country_key,category_key
 
 FIELDS=['crustdata_company_id','basic_info.name','basic_info.primary_domain','taxonomy.professional_network_industry',
         'locations.country','headcount.total','headcount.growth_percent','funding.last_round_type','funding.total_investment_usd','hiring.openings_count','metadata.updated_at']
@@ -34,8 +35,8 @@ def rows(page, mandate=None):
         gaps=['Financial statements and deal terms not supplied','Industry taxonomy is not proof of business model fit']
         fit=[]
         if mandate:
-            if mandate.geographies: fit.append('Geography matches' if any(x.casefold() in [v.casefold() for v in mandate.geographies] for x in countries) else 'Geography requires review')
-            if mandate.stages: fit.append('Stage matches' if funding.get('last_round_type') in mandate.stages else 'Stage requires review')
+            if mandate.geographies: fit.append('Geography matches' if any(country_key(x) in [country_key(v) for v in mandate.geographies] for x in countries) else 'Geography requires review')
+            if mandate.stages: fit.append('Stage matches' if category_key(funding.get('last_round_type','')) in [category_key(v) for v in mandate.stages] else 'Stage requires review')
             if mandate.sectors: fit.append('Sector thesis requires business-model verification')
         result.append({'ID':str(c.get('crustdata_company_id','')),'Company':basic.get('name'),
                        'Domain':basic.get('primary_domain'),'Sector':', '.join(industries),

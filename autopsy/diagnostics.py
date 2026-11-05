@@ -8,7 +8,7 @@ def safe_failure(response, secret=''):
         body=response.json()
         error=body.get('error',{}) if isinstance(body,dict) else {}
         if not isinstance(error,dict): return {'http_status':response.status_code}
-        message=str(error.get('message',''))
+        message=''.join(c for c in str(error.get('message','')) if c.isprintable())
         if secret: message=message.replace(secret,'[redacted]')
         return {'http_status':response.status_code,'provider_status':str(error.get('status',''))[:80],
                 'message':message[:600]}

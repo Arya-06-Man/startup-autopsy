@@ -23,6 +23,9 @@ def main():
     parser.add_argument('--fresh',action='store_true',help='Bypass response cache; preserve previous run history')
     parser.add_argument('--iterations',type=int,choices=range(5),help='Bound follow-up searches per company (0–4)')
     parser.add_argument('--no-llm',action='store_true',help='Explicit deterministic investigation; no generation calls')
+    parser.add_argument('--discovery-industry',default='',help='Exact industry label for the two-result discovery check')
+    parser.add_argument('--discovery-stage',default='',help='Exact funding round label for the discovery check')
+    parser.add_argument('--discovery-min-headcount',type=int,default=0,help='Minimum headcount for the discovery check')
     parser.add_argument('--output',default='data/reports')
     args=parser.parse_args()
     settings=Settings.load(); store=Store(); api=Crustdata(settings,store); planner=Planner(settings)
@@ -67,7 +70,8 @@ def main():
         if args.check_discovery:
             from autopsy.discovery import search_companies
             settings.cache_hours=0
-            result=search_companies(api,country=args.check_discovery,limit=2)
+            result=search_companies(api,country=args.check_discovery,industry=args.discovery_industry,
+                stage=args.discovery_stage,min_headcount=args.discovery_min_headcount,limit=2)
             print({'companies':[{'id':c.get('crustdata_company_id'),'identity':c.get('basic_info')} for c in result['companies']],
                    'mode':result['mode'],'retrieved_at':result['retrieved_at'],'has_next_page':bool(result['next_cursor'])})
             return 0

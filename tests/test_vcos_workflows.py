@@ -48,6 +48,7 @@ def test_committee_fallback_reports_and_actual_diff():
     assert len(changes({'valuation':1},{'valuation':2}))==1
     assert changes({'valuation':1},{'valuation':2})[0]['before']==1
     assert changes(ctx,ctx)==[]
+    assert changes({'deals':[{'terms':{'valuation':80}}]},{'deals':[{'terms':{'valuation':180}}]})[0]['path']=='deals[0].terms.valuation'
     malicious=context(Mandate(capital=100),[deal(name='<script>alert(1)</script>')],{})
     assert '<script>' not in export(malicious)['html']
     planner.close()

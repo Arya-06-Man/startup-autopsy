@@ -39,7 +39,7 @@ def investigate(queries,api,store,planner=None,progress=None,identity_selections
             stage('PLAN','Resolve identity; require dated comparable counts and attributed sources. Permitted tools: identify, enrich, search, fetch.')
             d.status='running'
             stage('GATHER','Retrieve company, workforce, hiring, funding, leadership and news records.')
-            gather(api,d)
+            gather(api,d,canonical)
             if d.company_id in canonical:
                 d.status='duplicate'; d.errors.append('Canonical company already investigated in this run.'); continue
             canonical.add(d.company_id)
@@ -79,9 +79,12 @@ def investigate(queries,api,store,planner=None,progress=None,identity_selections
     run.status=('complete' if all(d.status in ('complete','duplicate') for d in run.companies) else
                 'failed' if not any(d.evidence for d in run.companies) else 'partial')
     run.usage=api.usage()
-    run.usage['analysis_engine']='GEMINI + DETERMINISTIC CALCULATIONS' if any(d.metadata.get('analysis_engine')=='GEMINI' for d in run.companies) else 'DETERMINISTIC FALLBACK'
+    engines={d.metadata.get('analysis_engine') for d in run.companies if d.metadata.get('analysis_engine')}
+    run.usage['analysis_engine']=('GEMINI + DETERMINISTIC CALCULATIONS' if engines=={'GEMINI'} else
+        'MIXED GEMINI / DETERMINISTIC FALLBACK' if 'GEMINI' in engines else 'DETERMINISTIC FALLBACK')
     if planner: run.usage.update(llm_calls=planner.calls,llm_model=planner.model,llm_diagnostic=planner.error,llm_diagnostics=planner.diagnostics())
     run.usage['incomplete_reasons']=[{'query':d.query,'status':d.status,'reasons':d.errors} for d in run.companies if d.status not in ('complete','duplicate')]
     if api.cache_hits: run.mode='CACHED REAL DATA' if not api.calls else 'LIVE DATA + CACHED REAL DATA'
+    if not any(d.evidence for d in run.companies): run.mode='NO USABLE EVIDENCE'
     store.save(run)
     return run

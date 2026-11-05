@@ -1,5 +1,5 @@
 """Independent execution, coverage, freshness and verification summaries."""
-from datetime import datetime,timezone,date
+from datetime import date
 
 
 def company_health(dossier):

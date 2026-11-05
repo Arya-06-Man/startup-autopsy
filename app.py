@@ -19,21 +19,18 @@ st.set_page_config(page_title='Startup Autopsy VCOS',page_icon='◈',layout='wid
 st.markdown('''<style>
 .block-container{padding-top:2.5rem;max-width:1500px}h1{font-weight:650!important;letter-spacing:-.045em}h2{letter-spacing:-.025em}div[data-testid="stMetric"]{background:#121c2a;border:1px solid #263448;border-radius:12px;padding:20px}div[data-testid="stMetricLabel"]{color:#93a5bd}.eyebrow{font-size:.75rem;letter-spacing:.2em;color:#58dac2;font-weight:650}.intro{color:#93a5bd;max-width:780px;font-size:1.05rem}.stTabs [data-baseweb="tab-list"]{gap:24px}a{color:#58dac2}section[data-testid="stSidebar"]{border-right:1px solid #263448}div[data-testid="stExpander"]{border-color:#263448}
 </style>''',unsafe_allow_html=True)
+st.markdown('<style>h1{font-size:2.1rem!important}div[data-testid="stMetricValue"]{font-size:1.6rem}div[data-testid="stMetric"]{padding:16px}.stButton>button{border-radius:8px}</style>',unsafe_allow_html=True)
 settings=Settings.load(); store=Store()
 with st.sidebar:
     st.markdown('### ◈ STARTUP AUTOPSY')
     st.caption('VENTURE CAPITAL OPERATING SYSTEM')
-    st.divider()
-    st.markdown('**Detect → Investigate → Verify**  \nAssess → Recommend → Report')
-    st.caption('Autonomous analyst service for investor follow-up.')
-    st.divider()
-    st.markdown('**Connection status**')
-    st.write('● Crustdata key configured' if settings.api_key else '○ Crustdata key required')
-    st.write('● Gemini configured' if settings.gemini_key else '● Deterministic research enabled')
-    st.caption('A configured key is validated on its first request.')
-    with st.expander('Investigation limits'):
+    with st.expander('Providers & investigation budgets'):
+        st.write('Crustdata: key configured' if settings.api_key else 'Crustdata: key required')
+        st.write('Gemini: key configured' if settings.gemini_key else 'AI: deterministic fallback')
+        st.caption('Model: '+(settings.gemini_model or 'gemini-3.5-flash preferred after discovery'))
+        st.caption('Configuration is not generation success. Recorded provider results appear in Evidence & Reports.')
         settings.max_calls=st.number_input('Maximum API attempts',min_value=1,max_value=100,value=max(1,min(100,settings.max_calls)))
-        settings.max_credits=st.number_input('Estimated credit ceiling',min_value=1.0,max_value=500.0,value=max(1.,min(500.,settings.max_credits)))
+        settings.max_credits=st.number_input('Estimated credit ceiling',min_value=1.0,max_value=500.0,value=float(max(1.,min(500.,settings.max_credits))))
         settings.max_iterations=st.slider('Follow-up iterations / company',0,4,min(4,max(0,settings.max_iterations)))
         st.caption('Enrichment reserves 5 estimated credits per call. Actual plan prices may vary; this is an estimate ceiling, not a guaranteed billing cap. Retries consume the attempt budget.')
     st.caption('ContextCon 04 · IIT Kanpur  \nInvesting / Services, Replaced')
@@ -48,11 +45,11 @@ if section=='Discover':
 with st.expander('Launch investigation',expanded=not bool(store.runs())):
     left,right=st.columns([3,2])
     with left:
-        text=st.text_area('Company names or domains',placeholder='retool.com\nnotion.so\nlinear.app',height=130,key='investigation_queries',help='One company per line. Up to five unique companies. Domains resolve more precisely.')
+        text=st.text_area('Company names or domains',placeholder='retool.com\nrazorpay.com',height=130,key='investigation_queries',help='One company per line. Up to five unique companies. Domains resolve more precisely.')
     with right:
         upload=st.file_uploader('Or upload portfolio CSV',type=['csv'])
         st.caption('Column: company, name, or domain. CSV and pasted entries are combined and deduplicated.')
-        st.download_button('Download sample CSV','domain\nretool.com\nnotion.so\nlinear.app\n','sample_portfolio.csv','text/csv')
+        st.download_button('Download sample CSV','domain\nretool.com\nrazorpay.com\n','sample_portfolio.csv','text/csv')
     launch=st.button('Launch autonomous investigation',type='primary',disabled=not settings.api_key)
     settings.refresh_data=st.checkbox('Refresh provider data for this investigation',help='Bypass the response cache on launch. This retrieves provider data again; it does not guarantee a new underlying observation. Prior investigations remain unchanged.')
     if not settings.api_key: st.info('Add CRUSTDATA_API_KEY to .env to enable live investigations. Previous real runs remain available below.')
@@ -114,7 +111,7 @@ with command:
         st.caption('Independently corroborated findings: '+str(sum(e.status=='corroborated observation' for d in companies for e in d.evidence)))
     with b:
         counts=pd.Series([d.assessment.label for d in companies]).value_counts().rename_axis('Priority').reset_index(name='Companies')
-        fig=px.pie(counts,names='Priority',values='Companies',hole=.7,color_discrete_sequence=['#58dac2','#e7b868','#ed7285','#7299d6'])
+        fig=px.pie(counts,names='Priority',values='Companies',hole=.7,color='Priority',color_discrete_map={'Urgent review':'#ed7285','Focused review':'#e7b868','Routine review':'#58dac2','Insufficient evidence':'#93a5bd'})
         fig.update_layout(height=280,margin=dict(t=10,b=10,l=0,r=0),paper_bgcolor='rgba(0,0,0,0)',legend=dict(orientation='h'))
         st.plotly_chart(fig,width='stretch')
     st.caption(reports.DISCLAIMER)

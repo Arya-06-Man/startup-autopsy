@@ -35,7 +35,7 @@ def test_incompatible_instruments_withhold_math(instrument):
 
 
 @pytest.mark.parametrize('updates',[{'round_size':10},{'valuation_basis':'post-money','valuation':10},
-    {'investment':float('inf')},{'cash':-1},{'monthly_burn':0},{'downside_moic':-1}])
+    {'investment':float('inf')},{'cash':-1},{'monthly_burn':-1},{'downside_moic':-1}])
 def test_invalid_terms(updates):
     with pytest.raises(ValueError): deal(**updates)
 

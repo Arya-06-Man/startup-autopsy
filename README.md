@@ -7,13 +7,15 @@ Startup Autopsy replaces substantial first-pass VC analyst work: company discove
 
 Built for **ContextCon 04, IIT Kanpur · Investing · Services, Replaced**.
 
+Public repository: [Arya-06-Man/startup-autopsy](https://github.com/Arya-06-Man/startup-autopsy). See the [final QA audit](docs/FINAL_QA.md) for actual provider results, workflow validation and limitations.
+
 ## Use the decision workspace
 
 1. **Overview:** describe your thesis, apply guided mandate edits, review every constraint and save. All fields—including existing holdings, ownership targets and custom rejection criteria—are editable in the advanced JSON view. Mandates persist locally.
-2. **Discover:** search Crustdata by documented industry, country, funding round, headcount and growth filters. Sort/search each page, page with a stable cursor, save named watchlists and shortlist 2–5 companies. Explicitly launch the existing bounded investigation below the search results. Search does not deeply enrich all companies.
+2. **Discover:** search Crustdata by documented industry, country, funding round, headcount and growth filters. Sort/search each page, page with a stable cursor, save named watchlists and shortlist 2–5 companies. **Add selected to evaluation** preserves the shortlist; investigate it explicitly before a conditional allocation becomes reviewable. Search does not deeply enrich all companies. Refresh controls bypass cache without deleting history; fresh retrieval does not guarantee fresh underlying observations.
 3. **Evaluate:** select companies from an investigation or enter domains for a terms-only comparison. Use the guided editor to supply terms and dated financial inputs. Unknowns remain blank. Financials are user-provided, not sourced or inferred by AI. A term-sheet, cap-table or financial-statement label is an attestation, not automatic document verification.
 4. **Portfolio Lab:** compute constrained allocations and alternative scenario objectives. The optimizer may invest in neither. Missing approval-critical evidence, incompatible instruments and mandate violations exclude a deal. Existing holdings aggregate at cost. Reserve and liquidity capital remain separate.
-5. **War Room:** compare cash paths, financing delays, exit values, ownership, MOIC and simplified annualized returns over 1/3/5/7/10 years. Model a single ordinary-equity financing round and follow-on requirement. Save and reopen scenarios.
+5. **War Room:** compare cash paths, financing delays, exit values, ownership, MOIC and simplified annualized returns over 1/3/5/7/10 years. Cash paths recalculate immediately and inputs persist across navigation. Explicitly apply modeled MOIC outcomes to an opportunity with matching entry ownership and cost basis, then recompute allocation. Model a single ordinary-equity financing round and follow-on requirement. Save and reopen scenarios.
 6. **Investment Committee:** challenge the thesis with three structured roles from one provider, or explicitly labeled deterministic checklists when Gemini is unavailable. Export HTML, Markdown and JSON memos and save decision snapshots. Replay uses actual prior inputs and frozen evidence, with structural before/after differences.
 7. **Evidence & Reports:** retain the original dossiers, six detailed investigation views, source ledger, history and research report exports. Observation, publication and retrieval dates are distinct; absent dates remain unknown.
 
@@ -59,30 +61,34 @@ Open **http://127.0.0.1:8501**. Start in Overview with your mandate. Discover ac
 .venv/bin/python -m autopsy.cli --check retool.com
 .venv/bin/python -m autopsy.cli --check-discovery IND
 .venv/bin/python -m autopsy.cli --check-llm
+.venv/bin/python -m autopsy.cli --diagnose-llm --model gemini-3.5-flash
+.venv/bin/python -m autopsy.cli --check-committee --model gemini-3.5-flash
 .venv/bin/python -m autopsy.cli --list-llm-models
-.venv/bin/python -m autopsy.cli retool.com notion.so
+.venv/bin/python -m autopsy.cli retool.com razorpay.com --fresh --iterations 0
 ```
 
 `--check` bypasses the response cache and makes one authenticated Company Identify request. It prints only normalized identity, never the API key. Headless investigations save the same dossiers as the UI and write reports to `data/reports/`. A partial investigation returns exit code 1 with completed evidence preserved.
 
+`--diagnose-llm` makes discovery plus two tiny plain/structured probes without retries. `--check-committee` uses explicitly synthetic diagnostic inputs with the real provider; it never claims those inputs describe a real company. Neither is part of pytest. `--fresh` bypasses HTTP cache; `--iterations 0` deliberately disables web follow-up for a low-cost integration check. `--no-llm` is an explicit deterministic mode.
+
 ### Validation performed in this build
 
-- **89 pytest tests executed and passed**, using mocked external network responses. Tests cover mandate validation/persistence, deterministic financial math, financing delays, impossible allocations, duplicate exposure, missing assumptions, zero deployment, reference rejection, escaping, replay, all seven routes, actual allocation/scenario UI actions and memo downloads.
+- **122 pytest tests executed and passed**, with mocked external network responses and synthetic companies in temporary directories. A complete AppTest journey performs mandate → discovery/watchlist → two-company investigation → guided terms → allocation → reactive scenario → applied outcomes → revised allocation → committee → exports → replay. It verifies ₹4 crore changes to ₹2 crore after an actual modeled downside change and restores the original decision. This is automated UI validation, separate from the live checks below.
 - Live connected Crustdata Identify resolved `retool.com` to company `633593`. Actual enrichment returned documented identity, workforce, hiring, funding and people fields. A narrower enrichment request also returned complete selected fields.
 - Actual connected Web Search and Web Fetch requests executed. One fetched page returned a “Page Unavailable” document despite transport success; blocked-page detection and a regression test were added.
 - An explicitly labeled **cached real MCP validation snapshot** was normalized, scored, rendered in the dashboard, and exported locally. It is private ignored data, not a shipped demo fixture.
-- **Direct Python HTTP validated:** uncached Identify succeeded; a real bounded Retool investigation completed with saved local reports and 55% scored evidence coverage. An uncached two-result Company Search succeeded for India, including a pagination cursor. A rejected projection was corrected using the provider's filterable/returnable field distinction. See [baseline audit](docs/BASELINE_AUDIT.md).
-- **Live Gemini generation remains unvalidated:** configured credentials successfully discovered models, but actual structured requests encountered HTTP 404/503 and timeouts, including the stable alias. Diagnostics preserve this limitation. Mocked structured planner and committee passes validate schemas and reject unsupported IDs. Fallback is never labeled Gemini success.
+- **Direct Python HTTP validated:** fresh run `1cf447edf997` completed Retool and Razorpay through four uncached Identify/Enrich calls, with 350/417 observations and 55% scored coverage each. Web follow-up was explicitly disabled for that smoke run. Uncached two-result Company Search also succeeded for India with a pagination cursor. Search requires `metadata.updated_at`, while Enrich accepted `updated_at`; missing provider update dates remain unknown. The earlier single-company `7ba175e66d54` run was cached real data, not a fresh HTTP investigation.
+- **Live Gemini generation validated:** `gemini-3.5-flash` succeeded for plain text, minimal structured JSON, the real research planner for both companies and all three committee roles. A private memo using real dossiers plus explicitly illustrative modeled terms completed all three actual Gemini passes, retained both deals as MORE DILIGENCE REQUIRED and allocated zero because company financials were absent. Earlier 404/503/timeouts remain documented. One transient 503 in the fresh research run recovered on a bounded retry. No alternative provider was used.
 - Streamlit started and its local health endpoint returned **HTTP 200 / ok**. No browser connection was available, so visual inspection and video recording remain outstanding. AppTest checks executed.
 
 ## What the product does
 
-- CSV/pasted portfolio validation, deduplication and exact-domain identity checks; ambiguous results request a specific domain rather than guessing.
+- CSV/pasted portfolio validation, canonical-ID deduplication before repeated enrichment and exact-first identity checks. Secondary name results must corroborate a primary domain or provider-documented alias, otherwise the UI requires explicit candidate comparison and revalidates the selected canonical ID/domain. `notion.so` remains unresolved in the executed check; Retool and Razorpay are the validated sample pair.
 - Collects actual Crustdata identity, headcount history, job-opening history, funding milestones, leadership profiles and provider news.
 - Calculates comparable dated workforce/hiring trends and uses their severity and evidence gaps to choose follow-up search topics.
 - Searches business or leadership developments, then fetches up to two readable, non-redirect source pages per iteration. Search snippets remain unverified leads. Blocked pages remain unknown.
 - Optional Gemini proposes hypotheses, benign alternatives, permitted research focus and founder questions. Pydantic validates its structure; unsupported evidence IDs reject the entire plan. No model-generated assertion becomes a verified fact.
-- Preserves raw values, original source/API record references, event/publication/retrieval dates, verification status, conflicts and limitations.
+- Preserves raw values, source/API references, separate observation/event/publication/provider-update/retrieval dates, per-record live/cache provenance, verification status, conflicts and limitations.
 - Generates intervention steps, founder questions, a draft email, an HTML briefing, Markdown report, and machine-readable evidence ledger. **No email is sent.**
 - Persists after every stage, preserving completed company work across failures and interruptions.
 
@@ -111,7 +117,9 @@ For workforce and hiring:
 
 A low score never establishes safety. Hiring reductions may reflect roles filled, seasonality, efficiency, or coverage changes. Funding silence never proves a cash shortage. Source text and current leadership profiles do not establish departures without dated investigation. The numeric engine intentionally excludes unverified leadership/business events in this MVP.
 
-Runway is unavailable without supplied financial inputs. The legacy calculator remains local to its view. VCOS accepts dated user financials, labels them unverified, and includes supplied assumptions in committee reports and explicitly saved decision/scenario snapshots. Financial calculations do not become externally verified company evidence.
+Runway is unavailable without supplied financial inputs. Zero net burn has no finite depletion runway; negative net burn is unsupported by this simple calculator and is rejected. Revenue falling to zero is −100% growth, not unknown. The legacy calculator remains local to its view. VCOS labels financials as USER-PROVIDED DATA, MODELED ASSUMPTIONS or SYNTHETIC DEMO DATA and includes them in explicit snapshots/reports. Financial calculations do not become externally verified company evidence.
+
+Execution is **COMPLETED** when required work finishes, **PARTIAL** for useful but incomplete work, **FAILED** when no useful result is produced. Coverage, single-source verification status, model generation and investment readiness are separate. Original histories retain their recorded statuses; old Gemini-only partial runs are not silently rewritten.
 
 ## API integration and reliability
 
@@ -126,6 +134,8 @@ Runtime calls `https://api.crustdata.com` with `Authorization: Bearer …` and `
 | `POST /web/enrich/live` | `urls` (up to two here) | Source document retrieval |
 
 Verified documentation: [Identify](https://docs.crustdata.com/company-docs/identify/introduction), [Enrich](https://docs.crustdata.com/company-docs/enrichment/reference), [Web Search](https://docs.crustdata.com/web-docs/search/reference), [Fetch](https://docs.crustdata.com/web-docs/fetch/introduction), [pricing](https://docs.crustdata.com/general/pricing). Gemini uses [model discovery](https://ai.google.dev/api/models) and [generateContent](https://ai.google.dev/api/generate-content); runtime discovers a supported text Flash model or validates `GEMINI_MODEL` before generation.
+
+Gemini uses httpx REST, not the Google GenAI SDK. Automatic discovery prefers the live-verified `gemini-3.5-flash`; an explicit `GEMINI_MODEL` remains authoritative. Shared research/committee transport uses a 5-second connect/25-second request timeout, 2,048 output-token ceiling and low thinking for supported models. At most two generation attempts per pass: one retry for transient 503, or one advertised alternate after 404 when no explicit model was selected. Authentication, quota and invalid output open a circuit. Role outputs are hypotheses only; facts come from the original ledger. Provider/model/status, safe error details and validation failures are visible. Never assume model listing guarantees generation access.
 
 - One sequential HTTP client: conservative endpoint spacing (30 requests/minute for company calls, 10/minute for web calls), three maximum attempts, bounded backoff and 45-second HTTP timeouts.
 - Explicit handling of 400, 401, 402, 403, 404, 429, server failures, transport failures and invalid JSON. Authentication/credit exhaustion halts further uncached calls. Permission failures remain visible.
@@ -151,6 +161,9 @@ app.py                    Streamlit product interface
  autopsy/evidence.py      Normalization, provenance, references and conflicts
  autopsy/risk.py          Deterministic dated trend assessment and runway safeguards
  autopsy/llm.py           Optional structured Gemini planner with fallback
+ autopsy/diagnostics.py   Bounded credential-safe plain/structured provider probes
+ autopsy/identity.py      Exact-first lookup and explicit candidate disambiguation
+ autopsy/health.py        Independent execution/coverage/verification/freshness summaries
  autopsy/orchestrator.py  Bounded research decisions and action plans
  autopsy/reports.py       HTML, Markdown and JSON exports
  autopsy/briefing.html    Autoescaped standalone HTML report template
@@ -180,8 +193,8 @@ GitHub Actions runs pytest on Python 3.11 and 3.13. External calls are mocked in
 
 ## Remaining submission gates and model boundaries
 
-1. Obtain a successful live Gemini structured response before claiming AI committee validation; current failures remain visible.
-2. Perform browser visual review and record the two-minute demo; no connected browser was available during this implementation.
+1. Perform browser visual review and record/upload the two-minute demo; no connected browser was available during implementation. Precise recording steps and narration are in [DEMO.md](docs/DEMO.md). Confirm the official deadline from the handbook; this repository does not invent a deadline or claim a submitted video.
+2. Recheck provider status before presenting. Live Gemini is validated, but transient overload can still produce a visible deterministic fallback.
 3. Supply real company-owned financial inputs and terms before presenting an actionable allocation. External company enrichment does not establish valuation or solvency.
 4. Advanced SAFE/note/preferred conversion and liquidation waterfalls, multi-round cap tables, automated financial-document extraction, semantic contradiction verification and stress outcomes for existing holdings are not implemented. Existing holdings do affect all concentration constraints; current stress testing covers new allocations. Cap-table math models one ordinary-equity round with an explicit post-round pool convention.
 5. Revenue sensitivity assumes changes pass fully through to cash flow against current net burn. Cash exhaustion is absorbing and implies zero recovery; cash paths stop at exhaustion. Exit proceeds exclude preferences, taxes and fees. These assumptions are inspectable beside outputs.

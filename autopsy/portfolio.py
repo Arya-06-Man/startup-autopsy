@@ -1,12 +1,13 @@
 """Bounded mixed-integer scenario allocation; no estimated return probabilities."""
 import numpy as np
 from scipy.optimize import milp, Bounds, LinearConstraint
-from autopsy.finance import readiness
+from autopsy.finance import readiness,deal_metrics
+from autopsy.mandate import category_key
 
 
 def allocate(mandate, deals, dossiers=None, strategy=None):
     if len(deals)>5: raise ValueError('At most five candidate deals')
-    ids=[d.company_id for d in deals]
+    ids=[category_key(d.company_id) for d in deals]
     if len(set(ids))!=len(ids): raise ValueError('Duplicate candidate company exposures')
     strategy=strategy or {'Conservative':'downside','Moderate':'robust','Aggressive':'base'}[mandate.risk]
     if strategy not in ('downside','base','robust'): raise ValueError('Unsupported allocation strategy')
@@ -26,8 +27,8 @@ def allocate(mandate, deals, dossiers=None, strategy=None):
             'sector_exposure':{},'stage_exposure':{}}
     # Existing rows deliberately aggregate duplicates rather than losing exposure.
     for field,limit in [('company_id',mandate.company_limit),('sector',mandate.sector_limit),('stage',mandate.stage_limit)]:
-        for value in {getattr(h,field) for h in mandate.existing}:
-            exposure=sum(h.amount for h in mandate.existing if getattr(h,field)==value)
+        for value in {category_key(getattr(h,field)) for h in mandate.existing}:
+            exposure=sum(h.amount for h in mandate.existing if category_key(getattr(h,field))==value)
             if exposure>mandate.capital*limit+1e-7: result['violations'].append(f'Existing {field} exposure exceeds limit: {value}')
     if result['violations'] or not candidates:
         result['reason']='No feasible new investment; resolve constraints or missing diligence.'
@@ -48,12 +49,13 @@ def allocate(mandate, deals, dossiers=None, strategy=None):
         row=np.zeros(size); row[:n]=1; add(row,h=mandate.deployable/mandate.capital)
         for i,d in enumerate(candidates):
             row=np.zeros(size); row[i]=1; row[n+i]=-upper[i]; add(row,h=0)
-            row=np.zeros(size); row[i]=-1; row[n+i]=mandate.min_cheque/mandate.capital; add(row,h=0)
+            ownership_min=(mandate.target_ownership_min or 0)*deal_metrics(d)['post_money']
+            row=np.zeros(size); row[i]=-1; row[n+i]=max(mandate.min_cheque,ownership_min)/mandate.capital; add(row,h=0)
         for field,limit in [('company_id',mandate.company_limit),('sector',mandate.sector_limit),('stage',mandate.stage_limit)]:
-            for value in {getattr(d,field) for d in candidates}:
+            for value in {category_key(getattr(d,field)) for d in candidates}:
                 row=np.zeros(size)
-                for i,d in enumerate(candidates): row[i]=int(getattr(d,field)==value)
-                existing=sum(h.amount for h in mandate.existing if getattr(h,field)==value)
+                for i,d in enumerate(candidates): row[i]=int(category_key(getattr(d,field))==value)
+                existing=sum(h.amount for h in mandate.existing if category_key(getattr(h,field))==value)
                 add(row,h=limit-existing/mandate.capital)
         if robust:
             for scenario in ('downside','base','upside'):
@@ -77,8 +79,12 @@ def allocate(mandate, deals, dossiers=None, strategy=None):
             result['modeled_new_capital_proceeds']={s:sum(result['allocations'][d.company_id]*getattr(d,s+'_moic') for d in candidates)+result['uninvested'] for s in ('downside','base','upside')}
     for field in ('sector','stage'):
         exposure={}
-        for h in mandate.existing: exposure[getattr(h,field)]=exposure.get(getattr(h,field),0)+h.amount
-        for d in deals: exposure[getattr(d,field)]=exposure.get(getattr(d,field),0)+result['allocations'][d.company_id]
+        labels={}
+        for item in [*mandate.existing,*deals]: labels.setdefault(category_key(getattr(item,field)),getattr(item,field).strip())
+        for h in mandate.existing:
+            label=labels[category_key(getattr(h,field))]; exposure[label]=exposure.get(label,0)+h.amount
+        for d in deals:
+            label=labels[category_key(getattr(d,field))]; exposure[label]=exposure.get(label,0)+result['allocations'][d.company_id]
         result[field+'_exposure']=exposure
     return result
 

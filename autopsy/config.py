@@ -8,7 +8,7 @@ load_dotenv()
 class Settings:
     api_key: str = ''
     max_calls: int = 20
-    max_credits: float = 30
+    max_credits: float = 30.0
     max_iterations: int = 2
     cache_hours: float = 24
     gemini_key: str = ''

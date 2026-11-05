@@ -8,6 +8,15 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from autopsy.models import now
 
 
+def category_key(value): return str(value).strip().casefold()
+
+
+def country_key(value):
+    key=category_key(value)
+    return {'india':'ind','united states':'usa','united states of america':'usa',
+            'united kingdom':'gbr','uk':'gbr','singapore':'sgp'}.get(key,key)
+
+
 class Validated(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
 

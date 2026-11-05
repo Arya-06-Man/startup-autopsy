@@ -15,12 +15,14 @@ from autopsy.llm import Planner
 from autopsy.identity import identify_company,IdentityError,candidate_rows
 from autopsy.health import company_health
 from autopsy.models import Dossier
+from autopsy.evidence import safe_url
 
 NAV=['Overview','Discover','Evaluate','Portfolio Lab','War Room','Investment Committee','Evidence & Reports']
 
 
 def parsed_editor(label,value,key,height=220):
-    return st.text_area(label,json.dumps(value,indent=2,ensure_ascii=False,default=str),key=key,height=height)
+    if key not in st.session_state: st.session_state[key]=json.dumps(value,indent=2,ensure_ascii=False,default=str)
+    return st.text_area(label,key=key,height=height)
 
 
 def render(settings,store):
@@ -53,25 +55,34 @@ def render(settings,store):
     if section=='Overview':
         st.subheader('Investment overview')
         metrics=st.columns(4)
-        metrics[0].metric('Available investment capital',f'{mandate.currency} {mandate.deployable:,.0f}' if mandate else 'Set mandate')
-        metrics[1].metric('Current opportunities',len(deals))
+        metrics[0].metric('Total portfolio capital',f'{mandate.currency} {mandate.capital:,.0f}' if mandate else 'Set mandate')
+        metrics[1].metric('Available after reserves',f'{mandate.currency} {mandate.deployable:,.0f}' if mandate else '—')
         reviews=[readiness(mandate,d,dossiers.get(d.company_id)) for d in deals] if mandate else []
-        metrics[2].metric('Requiring diligence',sum(bool(r['missing']) for r in reviews))
-        metrics[3].metric('Outside mandate',sum(bool(r['violations']) for r in reviews))
-        st.info('Next action: '+('Review investment constraints below.' if not mandate else 'Discover companies or select existing investigations, then enter deal terms in Evaluate.'))
+        metrics[2].metric('Deals under evaluation',len(deals))
+        metrics[3].metric('Reviewable deals',sum(r['status'] in ('CONDITIONALLY REVIEWABLE','READY FOR COMMITTEE REVIEW') for r in reviews))
+        if not mandate: action,target='Review and save your investment mandate.','Overview'
+        elif not deals: action,target='Discover opportunities and investigate a shortlist.','Discover'
+        elif any(r['violations'] or r['missing'] for r in reviews): action,target='Resolve deal breakers and missing diligence before allocating capital.','Evaluate'
+        else: action,target='Compare feasible allocations and challenge the thesis.','Portfolio Lab'
+        st.info('Next action: '+action)
+        if target!='Overview' and st.button('Open '+target,type='primary'):
+            st.session_state['requested_section']=target; st.rerun()
+        if mandate:
+            st.caption(f'Follow-on reserve: {mandate.currency} {mandate.reserve:,.0f} · Liquidity buffer: {mandate.liquidity_buffer:,.0f} · Outside mandate: {sum(bool(r["violations"]) for r in reviews)} · Require diligence: {sum(bool(r["missing"]) for r in reviews)}')
         st.caption('Capital means total portfolio capital at cost, including existing holdings. Reserve and liquidity are excluded from deployment. Existing private records remain local.')
         mandate_builder(workspace,mandate,saved)
     elif section=='Discover':
         st.subheader('Discover opportunities')
         st.caption('Indexed company search · version 2025-11-01 · 10 results per page · no automatic deep enrichment. Filters use exact provider labels. Search observations do not establish investment readiness.')
-        with st.form('discovery_filters'):
+        previous_filters=st.session_state.get('discovery_filters',{})
+        with st.form('discovery_search_form'):
             a,b,c=st.columns(3)
-            industry=a.text_input('Industry label',help='Exact Crustdata industry, e.g. Software Development')
-            country=b.text_input('Country label or ISO alpha-3',help='For example IND; country means indexed company locations, not necessarily domicile.')
-            stage=c.text_input('Funding round type',help='Exact provider label, e.g. series_a')
+            industry=a.text_input('Industry label',value=previous_filters.get('industry',''),help='Exact Crustdata industry, e.g. Software Development')
+            country=b.text_input('Country label or ISO alpha-3',value=previous_filters.get('country',''),help='For example IND; country means indexed company locations, not necessarily domicile.')
+            stage=c.text_input('Funding round type',value=previous_filters.get('stage',''),help='Exact provider label, e.g. series_a')
             a,b=st.columns(2)
-            head=a.number_input('Minimum headcount',min_value=0,value=0)
-            growth=b.text_input('Minimum 6m headcount growth % (optional)')
+            head=a.number_input('Minimum headcount',min_value=0,value=int(previous_filters.get('min_headcount',0)))
+            growth=b.text_input('Minimum 6m headcount growth % (optional)',value=str(previous_filters.get('growth')) if previous_filters.get('growth') is not None else '')
             refresh=st.checkbox('Refresh discovery data',help='Bypass the response cache for this explicit search. Existing investigation histories are retained.')
             search=st.form_submit_button('Search Crustdata',disabled=not settings.api_key,type='primary')
         filters=dict(industry=industry,country=country,stage=stage,min_headcount=head,growth=float(growth) if growth.strip() and _is_number(growth) else None)
@@ -80,6 +91,8 @@ def render(settings,store):
             else: discovery_request(settings,store,filters,refresh=refresh)
         page=st.session_state.get('discovery_page')
         if page:
+            if st.session_state.get('discovery_error'):
+                st.warning('The latest search failed. Showing the previous successful result page with its original filters and retrieval date.')
             st.caption(f'{page["mode"]} · retrieved {page["retrieved_at"]} · why included: {json.dumps(page["filters"])}')
             table=rows(page,mandate)
             query=st.text_input('Search this result page')
@@ -146,10 +159,11 @@ def render(settings,store):
         if st.button('Prepare editable deal terms',disabled=not ids):
             st.session_state['terms_json']=json.dumps(templates,indent=2,ensure_ascii=False)
         if 'terms_json' in st.session_state:
-            with st.form('deal_terms'):
-                raw=st.text_area('Deal terms · editable JSON',key='terms_json',height=370)
-                st.caption('Required document attestations: Financial statements, Cap table, Term sheet. These labels do not verify contents. Return MOIC values are user-modeled assumptions. Supported financial_date: YYYY-MM-DD. Leave unknown financials null. All terms remain reviewable.')
-                submit=st.form_submit_button('Validate and compare',type='primary')
+            with st.expander('Advanced deal terms · JSON'):
+                with st.form('deal_terms'):
+                    raw=st.text_area('Deal terms · editable JSON',key='terms_json',height=370)
+                    st.caption('Required document attestations: Financial statements, Cap table, Term sheet. These labels do not verify contents. Return MOIC values are user-modeled assumptions. Supported financial_date: YYYY-MM-DD. Leave unknown financials null. All terms remain reviewable.')
+                    submit=st.form_submit_button('Validate and compare',type='primary')
             if submit:
                 try:
                     parsed=json.loads(raw)
@@ -189,7 +203,7 @@ def render(settings,store):
                 if not frame.empty and frame['Capital at cost'].sum()>0:
                     column.plotly_chart(px.bar(frame,x='Category',y='Capital at cost',title=field.replace('_',' ').title(),color_discrete_sequence=['#58dac2']),width='stretch')
             with st.expander('Alternative feasible strategies'):
-                st.json(st.session_state.get('alternatives',[]))
+                st.dataframe(pd.DataFrame([{'Objective':a['strategy'],'Allocated':sum(a['allocations'].values()),'Uninvested':a['uninvested'],'Reserve':a['reserve'],'Explanation':a['reason']} for a in st.session_state.get('alternatives',[])]),hide_index=True,width='stretch')
             with st.expander('Stress new allocations'):
                 compression=st.slider('Exit outcome multiplier',0.,2.,.7,.05)
                 failed=st.multiselect('Company failure / zero recovery',[d.company_id for d in deals],format_func=lambda cid:next(d.name for d in deals if d.company_id==cid))
@@ -204,7 +218,9 @@ def render(settings,store):
         st.subheader('Investment committee challenge')
         if not mandate or not deals: st.info('Save a mandate and deal terms first.'); return section
         allocation=current_allocation(mandate,deals,dossiers)
-        ctx=context(mandate,deals,dossiers,allocation)
+        try: ctx=context(mandate,deals,dossiers,allocation)
+        except ValueError as exc:
+            st.error('Decision evidence validation failed: '+str(exc)); return section
         ctx['war_room']=st.session_state.get('war_outcomes')
         comparison(mandate,deals,dossiers)
         st.caption('One Gemini provider, three structured role passes. Failed calls or invalid references produce visibly labeled deterministic checklists. Final readiness comes from deterministic rules, not AI approval.')
@@ -218,14 +234,19 @@ def render(settings,store):
         committee=st.session_state.get('committee') if st.session_state.get('committee_context')==context_fingerprint(ctx) else None
         if committee:
             st.caption('Analysis engine: '+committee['engine'])
+            st.info('AI-generated hypotheses and draft questions. Factual findings and calculations remain linked to the ledger and deterministic tables.')
             for perspective in committee['perspectives']:
                 with st.expander(perspective['role']+' · '+perspective['engine'],expanded=True):
                     for item in perspective['thesis']+perspective['challenges']:
-                        st.write(item['claim']); st.caption('References: '+', '.join(item['references']))
+                        st.write(item['claim']); st.caption('Hypothesis / challenge · References: '+', '.join(item['references']))
                     for question in perspective['questions']: st.write(question)
             for diagnostic in committee['diagnostics']: st.warning(diagnostic)
+            with st.expander('Provider, model and generation diagnostics'):
+                st.json(committee.get('provider_diagnostics',{}))
         st.markdown('**Decision memo exports**')
-        artifacts=export(ctx,committee)
+        try: artifacts=export(ctx,committee)
+        except ValueError as exc:
+            st.error('Memo validation failed; export withheld: '+str(exc)); return section
         a,b,c=st.columns(3)
         for col,extension,mime in [(a,'html','text/html'),(b,'md','text/markdown'),(c,'json','application/json')]:
             col.download_button('Download '+extension.upper()+' memo',artifacts[extension],'vcos-committee.'+extension,mime)
@@ -235,7 +256,7 @@ def render(settings,store):
     elif section=='Evidence & Reports':
         st.subheader('Evidence, provenance & investigation history')
         if run:
-            st.caption('Execution: '+run.status.upper()+' · Engine: '+run.usage.get('analysis_engine','Legacy run: see decision trace')+' · '+run.mode)
+            st.caption('Execution: '+('COMPLETED' if run.status=='complete' else run.status.upper())+' · Engine: '+run.usage.get('analysis_engine','Legacy run: see decision trace')+' · '+run.mode)
             st.caption('Evidence coverage is a separate measurement. Decision confidence is uncalibrated; committee readiness requires primary financial and legal review.')
             st.dataframe(pd.DataFrame([{'Company':d.name or d.query,**{k:v for k,v in company_health(d).items() if k in ('execution','coverage_percent','verification','latest_observation','provider_updated_at','retrieved_at')}} for d in run.companies]),hide_index=True,width='stretch')
             for d in run.companies:
@@ -287,18 +308,25 @@ def mandate_builder(workspace,mandate,saved):
             a,b=st.columns(2)
             reserve=a.number_input('Follow-on reserve %',min_value=0.,max_value=100.,value=max(0.,min(100.,initial.get('reserve_fraction',.3)*100)))
             liquidity=b.number_input('Liquidity buffer',min_value=0.,value=max(0.,float(initial.get('liquidity_buffer',0))))
-            apply=st.form_submit_button('Apply guided edits for review')
+            apply=st.form_submit_button('Save reviewed mandate',type='primary')
         if apply:
             initial.update(name=name,capital=capital,currency=currency.upper().strip(),risk=risk,horizon_years=horizon,
                 sectors=_csv(sectors),stages=_csv(stages),geographies=_csv(geographies),min_cheque=minimum,max_cheque=maximum,
                 company_limit=company/100,sector_limit=sector/100,stage_limit=stage/100,reserve_fraction=reserve/100,liquidity_buffer=liquidity)
-            st.session_state['mandate_json']=json.dumps(initial,indent=2,ensure_ascii=False)
-            st.info('Edits applied below. Review existing holdings, optional ownership targets and hard rejection criteria, then validate and save.')
-    with st.form('mandate_form'):
-        initial=mandate.model_dump(mode='json') if mandate else Mandate(capital=1e8).model_dump(mode='json')
-        raw=parsed_editor('Review every mandate constraint · editable JSON',initial,'mandate_json',350)
-        st.caption('capital = total portfolio budget including existing holdings; existing = [{company_id, sector, stage, amount}]. Limits and reserve_fraction use fractions (0.25 = 25%). Empty preference lists allow any. Custom rejection criteria require an explicit per-deal review. Saved constraints are never changed by the LLM.')
-        submit=st.form_submit_button('Validate & save mandate',type='primary')
+            try:
+                from uuid import uuid4
+                reviewed=Mandate.model_validate(initial).model_copy(update={'id':uuid4().hex})
+                workspace.save('mandates',reviewed.model_dump(mode='json'))
+                st.session_state['mandate']=reviewed.model_dump(mode='json')
+                st.session_state['mandate_json']=reviewed.model_dump_json(indent=2)
+                st.rerun()
+            except ValueError as exc: st.error(str(exc))
+    with st.expander('Advanced constraints · holdings, ownership, rejection criteria & JSON'):
+        with st.form('mandate_form'):
+            initial=mandate.model_dump(mode='json') if mandate else Mandate(capital=1e8).model_dump(mode='json')
+            raw=parsed_editor('Review every mandate constraint · editable JSON',initial,'mandate_json',350)
+            st.caption('capital = total portfolio budget including existing holdings; existing = [{company_id, sector, stage, amount}]. Limits and reserve_fraction use fractions (0.25 = 25%). Empty preference lists allow any. Custom rejection criteria require an explicit per-deal review. Saved constraints are never changed by the LLM.')
+            submit=st.form_submit_button('Validate & save mandate',type='primary')
     if submit:
         try:
             value=Mandate.model_validate_json(raw)
@@ -317,19 +345,33 @@ def comparison(mandate,deals,dossiers):
     for d in deals:
         metrics=deal_metrics(d); result=readiness(mandate,d,dossiers.get(d.company_id))
         dossier=dossiers.get(d.company_id)
+        health=company_health(dossier) if dossier else {}
         table.append({'Company':d.name,'Readiness':result['status'],'Proposed investment':d.investment,
                       'Post-money':metrics['post_money'],'Ownership %':metrics['ownership']*100 if metrics['ownership'] is not None else None,
                       'Post-money / annual revenue':metrics['valuation_revenue_multiple'],'Runway months':metrics['runway_months'],
                       'Revenue growth %':metrics['revenue_growth']*100 if metrics['revenue_growth'] is not None else None,
                       'Gross margin':metrics['gross_margin'],'Operating margin':metrics['operating_margin'],
                       'Evidence coverage %':dossier.assessment.coverage if dossier else None,
+                      'Evidence verification':health.get('verification','Unknown'),
+                      'Latest observation':health.get('latest_observation') or 'Unknown',
+                      'Provider update':health.get('provider_updated_at') or 'Unknown',
+                      'API retrieval':health.get('retrieved_at') or 'No evidence retrieved',
                       'Team / operating signals':'; '.join(s.explanation+' ['+', '.join(s.evidence_ids)+']' for s in dossier.assessment.signals) if dossier else 'Unknown',
                       'Missing diligence':'; '.join(result['missing']),'Mandate violations':'; '.join(result['violations'])})
-    st.dataframe(pd.DataFrame(table).set_index('Company').T,width='stretch')
+    frame=pd.DataFrame(table).set_index('Company').T
+    st.dataframe(frame.where(pd.notna(frame),'Unknown'),width='stretch')
     st.caption('Valuation attractiveness depends on supplied revenue, growth and outcome assumptions; workforce and funding do not determine a ranking. Neither deal may be suitable. Financial sustainability and leadership stability remain unknown where primary evidence is missing.')
     for d in deals:
         with st.expander(d.name+' · calculation assumptions & terms'):
             st.json(deal_metrics(d)); st.caption(d.provenance)
+            dossier=dossiers.get(d.company_id)
+            if dossier:
+                ids={ref for signal in dossier.assessment.signals for ref in signal.evidence_ids}
+                observations=[{'Evidence ID':e.id,'Observation':e.observation_date or e.event_date,'Value':e.value,
+                    'Verification':e.status,'Source':e.source if safe_url(e.source) else None,'Retrieved':e.retrieved_at} for e in dossier.evidence if e.id in ids]
+                if observations:
+                    st.dataframe(pd.DataFrame(observations),hide_index=True,width='stretch',
+                        column_config={'Source':st.column_config.LinkColumn('Source / API reference')})
 
 
 def guided_deal_editor(cid,mandate,dossiers,previous):
@@ -347,6 +389,9 @@ def guided_deal_editor(cid,mandate,dossiers,previous):
         round_size=a.number_input('Total round size (0 = unknown)',min_value=0.,value=float(initial.get('round_size') or 0))
         instruments=['Ordinary equity','Preferred shares','SAFE','Convertible note']
         instrument=b.selectbox('Security / instrument',instruments,index=instruments.index(initial.get('instrument','Ordinary equity')))
+        provenance_options=['USER-PROVIDED DATA','MODELED ASSUMPTIONS','SYNTHETIC DEMO DATA']
+        provenance=st.selectbox('Investment input provenance',provenance_options,index=provenance_options.index(initial.get('provenance','USER-PROVIDED DATA')),
+            help='Use MODELED ASSUMPTIONS for illustrative terms or hypothetical financials. This label never changes the provenance of external company evidence.')
         financials=st.checkbox('I am supplying dated company financials',value=initial.get('cash') is not None)
         a,b,c=st.columns(3)
         cash=a.number_input('Supplied cash balance',min_value=0.,value=float(initial.get('cash') or 0))
@@ -367,6 +412,7 @@ def guided_deal_editor(cid,mandate,dossiers,previous):
             d=Deal(**(initial|dict(company_id=cid,name=dossiers[cid].name if cid in dossiers else cid,
                 currency=mandate.currency,sector=sector,stage=stage,geography=geography,investment=investment,
                 valuation=valuation,valuation_basis=basis,round_size=round_size or None,instrument=instrument,
+                provenance=provenance,
                 cash=cash if financials else None,monthly_burn=burn if financials else None,
                 revenue=revenue if financials else None,financial_date=financial_date if financials else None,
                 documents=documents,rejection_reviewed=rejection_reviewed,human_review_confirmed=human_review,
@@ -383,10 +429,16 @@ def guided_deal_editor(cid,mandate,dossiers,previous):
 
 def war_room(workspace):
     if st.session_state.get('replay_scenario_inputs'):
-        st.session_state.update(st.session_state.pop('replay_scenario_inputs'))
+        restored=st.session_state.pop('replay_scenario_inputs')
+        st.session_state.update(restored)
+        st.session_state['war_inputs']=restored
+        st.session_state['war_started']=True
+    for key,value in st.session_state.get('war_inputs',{}).items():
+        if key not in st.session_state: st.session_state[key]=value
     st.subheader('VC War Room')
     st.caption('MODELED ASSUMPTIONS · deterministic cash flows and ordinary-equity outcomes · not validated forecasts. Enter inputs in one currency. No provider financial values are inferred.')
-    with st.form('war_room'):
+    st.caption('Cash flows recalculate immediately as inputs change. Allocation changes require explicitly applying the modeled outcomes to a matching opportunity below.')
+    with st.container(border=True):
         a,b,c=st.columns(3)
         cash=a.number_input('Available cash',min_value=0.,value=0.,key='war_cash')
         burn=b.number_input('Monthly net burn',min_value=0.,value=0.,key='war_burn')
@@ -407,28 +459,42 @@ def war_room(workspace):
         downside=a.number_input('Downside exit value',min_value=0.,value=0.,key='war_downside')
         base=b.number_input('Base exit value',min_value=0.,value=0.,key='war_base')
         upside=c.number_input('Upside exit value',min_value=0.,value=0.,key='war_upside')
-        submit=st.form_submit_button('Run scenario comparison',type='primary')
-    if submit:
+        submit=st.button('Run scenario comparison',type='primary')
+    keys=['war_cash','war_burn','war_years','war_reduction','war_implementation','war_revenue','war_growth','war_financing','war_month','war_ownership','war_dilution','war_invested','war_downside','war_base','war_upside']
+    st.session_state['war_inputs']={key:st.session_state[key] for key in keys}
+    if submit or st.session_state.get('war_started') or cash>0 or burn>0:
         if not downside<=base<=upside:
+            st.session_state.pop('war_outcomes',None)
             st.error('Exit scenarios require downside <= base <= upside.'); return
-        s=Scenario(cash=cash,monthly_burn=burn,years=years,burn_reduction=reduction/100,
-            implementation_cost=implementation,monthly_revenue=revenue,monthly_revenue_growth=growth/100,
-            financing=financing,financing_month=month,ownership=ownership/100,dilution=dilution/100,invested=invested,exit_value=base)
-        outcomes={name:simulate(s.model_copy(update={'exit_value':value})) for name,value in [('Downside',downside),('Base',base),('Upside',upside),('Capital loss',0.)]}
-        outcomes['Baseline cash']=simulate(s.model_copy(update={'burn_reduction':0.,'implementation_cost':0.,'financing':0.,'monthly_revenue_growth':0.}))
-        st.session_state['war_outcomes']=outcomes
-        st.session_state['war_sensitivity']=[{'Financing month':m,'Exhaustion month':simulate(s.model_copy(update={'financing_month':m}))['cash_exhaustion_month']} for m in range(1,min(25,12*years+1))]
+        try:
+            s=Scenario(cash=cash,monthly_burn=burn,years=years,burn_reduction=reduction/100,
+                implementation_cost=implementation,monthly_revenue=revenue,monthly_revenue_growth=growth/100,
+                financing=financing,financing_month=month,ownership=ownership/100,dilution=dilution/100,invested=invested,exit_value=base)
+            outcomes={name:simulate(s.model_copy(update={'exit_value':value})) for name,value in [('Downside',downside),('Base',base),('Upside',upside),('Capital loss',0.)]}
+            outcomes['Baseline cash']=simulate(s.model_copy(update={'burn_reduction':0.,'implementation_cost':0.,'financing':0.,'monthly_revenue_growth':0.}))
+            st.session_state['war_outcomes']=outcomes
+            st.session_state['war_started']=True
+            st.session_state['war_sensitivity']=[{'Financing month':m,'Exhaustion month':simulate(s.model_copy(update={'financing_month':m}))['cash_exhaustion_month']} for m in range(1,min(25,12*years+1))]
+        except ValueError as exc:
+            st.session_state.pop('war_outcomes',None); st.error(str(exc)); return
     outcomes=st.session_state.get('war_outcomes')
     if outcomes:
+        base_case=outcomes['Base']
+        a,b,c,d=st.columns(4)
+        a.metric('Baseline runway',f'{base_case["baseline_runway_months"]:.1f} months' if base_case['baseline_runway_months'] is not None else 'No net burn')
+        b.metric('Cash exhaustion',f'Month {base_case["cash_exhaustion_month"]}' if base_case['cash_exhaustion_month'] is not None else 'Survives horizon')
+        c.metric('Base MOIC',f'{base_case["moic"]:.2f}×' if base_case['moic'] is not None else 'Cost basis required')
+        d.metric('Ending ownership',f'{base_case["ending_ownership"]:.2%}')
         st.dataframe(pd.DataFrame([{'Scenario':name,**{k:v for k,v in out.items() if k not in ('trajectory','assumptions','limitations')}} for name,out in outcomes.items()]),hide_index=True,width='stretch')
         trajectories=[{**point,'Scenario':name} for name,out in outcomes.items() if name in ('Base','Baseline cash') for point in out['trajectory']]
-        st.plotly_chart(px.line(pd.DataFrame(trajectories),x='month',y='cash',color='Scenario'),width='stretch')
+        st.plotly_chart(px.line(pd.DataFrame(trajectories),x='month',y='cash',color='Scenario',color_discrete_map={'Base':'#58dac2','Baseline cash':'#93a5bd'}),width='stretch')
         sensitivity=pd.DataFrame(st.session_state.get('war_sensitivity',[]))
         st.caption('Funding delay sensitivity · blank exhaustion means cash survives the modeled horizon.')
         st.dataframe(sensitivity,hide_index=True)
         with st.expander('All supplied assumptions and model conventions'): st.json(outcomes['Base']['assumptions']); st.write(outcomes['Base']['limitations'])
         if st.button('Save scenario snapshot'):
             workspace.save('snapshots',{'kind':'scenario','outcomes':outcomes}); st.success('Scenario saved')
+        scenario_to_opportunity(outcomes)
     with st.expander('Cap table & follow-on planner'):
         st.caption('Ordinary equity only. One financing round per calculation. No SAFEs, notes, preferred liquidation or participation rights. Pool fraction is newly issued post-financing ownership.')
         a,b=st.columns(2)
@@ -447,6 +513,26 @@ def war_room(workspace):
                     st.caption('Single supplied round only; other portfolio follow-on needs are not included.')
             except ValueError as exc: st.error(str(exc))
     decision_replay(workspace)
+
+
+def scenario_to_opportunity(outcomes):
+    deals=[Deal.model_validate(d) for d in st.session_state.get('vcos_deals',[])]
+    if not deals: return
+    with st.expander('Apply modeled outcomes to an opportunity'):
+        cid=st.selectbox('Opportunity for these modeled outcomes',[d.company_id for d in deals],format_func=lambda value:next(d.name for d in deals if d.company_id==value))
+        deal=next(d for d in deals if d.company_id==cid)
+        inputs=outcomes['Base']['assumptions']
+        metrics=deal_metrics(deal)
+        matching=(metrics['ownership'] is not None and abs(inputs['ownership']-metrics['ownership'])<1e-8 and abs(inputs['invested']-deal.investment)<.01 and deal.investment>0)
+        st.caption('Requires ordinary-equity entry ownership and cost basis matching the supplied opportunity. Applying outcomes changes modeled MOIC only; it does not overwrite financial evidence or legal terms.')
+        if not matching: st.warning('Match current ownership and total investor cost basis to this opportunity before applying outcomes.')
+        confirmed=st.checkbox('I confirm these modeled assumptions apply to this opportunity')
+        if st.button('Apply outcomes and invalidate prior allocation',disabled=not (matching and confirmed)):
+            values={'downside_moic':outcomes['Downside']['moic'],'base_moic':outcomes['Base']['moic'],'upside_moic':outcomes['Upside']['moic']}
+            revised=Deal.model_validate(deal.model_dump(mode='json')|values)
+            st.session_state['vcos_deals']=[revised.model_dump(mode='json') if d.company_id==cid else d.model_dump(mode='json') for d in deals]
+            for key in ('allocation','committee','terms_json'): st.session_state.pop(key,None)
+            st.success('Modeled outcomes applied. Recompute the conditional allocation in Portfolio Lab; previous saved decisions remain unchanged.')
 
 
 def decision_replay(workspace):
@@ -480,14 +566,42 @@ def decision_replay(workspace):
                 st.session_state['allocation']=prior['context'].get('allocation')
                 st.session_state['allocation_context']=fingerprint(restored_mandate,restored_deals,frozen)
                 st.session_state['war_outcomes']=prior['context'].get('war_room')
+                if st.session_state['war_outcomes']:
+                    st.session_state['replay_scenario_inputs']=scenario_widget_values(st.session_state['war_outcomes'])
+                else:
+                    st.session_state['war_inputs']={}
+                    st.session_state['war_started']=False
+                    for key in ('war_cash','war_burn','war_years','war_reduction','war_implementation','war_revenue','war_growth','war_financing','war_month','war_ownership','war_dilution','war_invested','war_downside','war_base','war_upside'):
+                        st.session_state.pop(key,None)
                 st.session_state['committee']=prior.get('committee')
                 st.session_state['committee_context']=context_fingerprint(prior['context'])
+                st.session_state['requested_section']='Investment Committee'
             st.rerun()
         if len(snapshots)>1:
             other=st.selectbox('Compare with snapshot',range(len(snapshots)),index=1 if selected==0 else 0,format_func=lambda i:snapshots[i]['created_at']+' · '+snapshots[i].get('kind','decision'))
             ignored={'created_at','id'}
             diff=changes({k:v for k,v in prior.items() if k not in ignored},{k:v for k,v in snapshots[other].items() if k not in ignored})
-            st.json(diff,expanded=False) if diff else st.info('No input or decision differences')
+            if diff:
+                a,b=st.columns(2)
+                for col,snapshot,label in [(a,prior,'Previous decision'),(b,snapshots[other],'Updated decision')]:
+                    col.markdown('**'+label+'**')
+                    allocation=snapshot.get('context',{}).get('allocation')
+                    col.write('Conditional deployment: '+f'{sum(allocation["allocations"].values()):,.2f}' if allocation else 'No allocation computed in this snapshot')
+                st.dataframe(pd.DataFrame([{'Changed input / output':item['path'],'Previous':json.dumps(item['before'],ensure_ascii=False,default=str)[:500],
+                    'Updated':json.dumps(item['after'],ensure_ascii=False,default=str)[:500]} for item in diff]),hide_index=True,width='stretch')
+                st.json(diff,expanded=False)
+            else: st.info('No input or decision differences')
+
+
+def scenario_widget_values(outcomes):
+    s=outcomes['Base']['assumptions']
+    return {'war_cash':s['cash'],'war_burn':s['monthly_burn'],'war_years':s['years'],
+        'war_reduction':round(s['burn_reduction']*100),'war_implementation':s['implementation_cost'],
+        'war_revenue':s['monthly_revenue'],'war_growth':s['monthly_revenue_growth']*100,
+        'war_financing':s['financing'],'war_month':s['financing_month'],'war_ownership':s['ownership']*100,
+        'war_dilution':s['dilution']*100,'war_invested':s['invested'],
+        'war_downside':outcomes['Downside']['assumptions']['exit_value'],'war_base':s['exit_value'],
+        'war_upside':outcomes['Upside']['assumptions']['exit_value']}
 
 
 def fingerprint(mandate,deals,dossiers):
@@ -524,7 +638,9 @@ def discovery_request(settings,store,filters,cursor=None,refresh=False):
         with st.spinner('Querying Crustdata company index'):
             st.session_state['discovery_page']=search_companies(api,**filters,cursor=cursor)
             st.session_state['discovery_filters']=filters
-    except (ResearchError,ValueError,TypeError) as exc: st.error(str(exc))
+            st.session_state.pop('discovery_error',None)
+    except (ResearchError,ValueError,TypeError) as exc:
+        st.session_state['discovery_error']=str(exc); st.error(str(exc))
     finally: api.close()
 
 
