@@ -25,8 +25,8 @@ def test_empty_dashboard(tmp_path,monkeypatch):
     app=Path(__file__).resolve().parents[1]/'app.py'
     at=AppTest.from_file(str(app)).run(timeout=20)
     assert not at.exception
-    assert 'Startup Autopsy VCOS' in at.title[0].value
-    assert 'Investment overview' in [s.value for s in at.subheader]
+    assert 'Investment Intelligence' in at.title[0].value
+    assert any(b.label=='Create Investment Mandate' for b in at.button)
 
 
 def test_populated_dashboard(tmp_path,monkeypatch):

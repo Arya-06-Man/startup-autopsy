@@ -125,6 +125,7 @@ def test_allocation_war_room_and_exports_workflow(tmp_path,monkeypatch):
 
 def test_mandate_validation_ui(tmp_path,monkeypatch):
     at=app(tmp_path,monkeypatch)
+    at.radio[0].set_value('Investment Mandate').run()
     editor=next(t for t in at.text_area if t.key=='mandate_json')
     value=json.loads(editor.value); value['company_limit']=2
     editor.set_value(json.dumps(value))
@@ -138,6 +139,7 @@ def test_mandate_validation_ui(tmp_path,monkeypatch):
 
 def test_bad_json_and_replay_preserve_actual_scenario(tmp_path,monkeypatch):
     at=app(tmp_path,monkeypatch)
+    at.radio[0].set_value('Investment Mandate').run()
     next(t for t in at.text_area if t.key=='mandate_json').set_value('{invalid json')
     button(at,'Validate & save mandate').click().run()
     assert at.error and not at.exception

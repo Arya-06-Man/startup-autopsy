@@ -24,19 +24,19 @@ This is a ready-to-read script and recording procedure. No video or browser visu
 
 “Startup Autopsy replaces the analyst workflow between company intelligence and an investment committee decision. Here is a ten-crore mandate with a thirty-percent follow-on reserve and hard exposure limits. Seven crore remains available before other holdings or liquidity needs.”
 
-Show Overview, the reviewed constraints and Save reviewed mandate. Never silently loosen a limit to make a deal pass.
+Show the Investment Intelligence homepage, then Create Investment Mandate, the reviewed constraints and Save reviewed mandate. Never silently loosen a limit to make a deal pass.
 
 ## 0:20–0:40 — Discovery and diligence
 
 “Discovery queries Crustdata's actual index. The filters explain why each company appeared. We shortlist candidates instead of enriching every search result. Here are two completed real investigations with their original source dates.”
 
-Show Discover, the real results table and Add selected to evaluation. Switch to the prepared Retool/Razorpay evidence context. Label archived/cached results accurately.
+Show Startup Discovery, the real results table and Add selected to evaluation. Switch to the prepared Retool/Razorpay evidence context. Label archived/cached results accurately.
 
 ## 0:40–1:00 — Comparison
 
 “These entry terms are illustrative modeled assumptions. Ordinary-equity ownership is calculated deterministically. Company financial statements remain unknown, so both deals require more diligence.”
 
-Show Evaluate, the side-by-side table, 20% ownership where using the prepared example, source coverage, financial unknowns and deal breakers.
+Show Deal Comparison, the side-by-side cards, 20% ownership where using the prepared example, source coverage, financial unknowns and deal breakers.
 
 ## 1:00–1:25 — Allocate and stress
 
@@ -54,7 +54,7 @@ Show the actual Gemini/fallback status, cited arguments and approval conditions.
 
 “The output is a decision memo with the mandate, terms, modeled outcomes, opposing arguments, evidence and missing diligence. No trade or founder outreach is executed.”
 
-Download/open HTML, Markdown or JSON. Show the executive summary and source dates. State the current executed test count from README; final QA recorded 129 passing offline tests plus separate real-provider checks.
+Use Generate Report to open Reports, then Download PDF or Print Report. HTML, Markdown and JSON remain available. Show the executive summary and source dates. State the current executed test count from README; final QA recorded 137 passing offline tests plus separate real-provider checks.
 
 ## Submission gate
 

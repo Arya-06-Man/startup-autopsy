@@ -48,6 +48,7 @@ def test_complete_investor_journey_a_through_f(tmp_path,monkeypatch):
     monkeypatch.setattr(Planner,'__init__',lambda self,settings,transport=None:original_llm(self,settings,httpx.MockTransport(llm)))
     at=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py')).run(timeout=30)
     assert not at.exception
+    click(at,'Create Investment Mandate')
     # A: reviewed mandate, discovery, watchlist, explicit handoff, real investigation controls.
     field(at,'number_input','Total portfolio capital').set_value(100000000.)
     field(at,'text_input','Sector preferences (comma separated)').set_value('Software')

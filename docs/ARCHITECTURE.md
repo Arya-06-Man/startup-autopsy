@@ -19,7 +19,7 @@ flowchart LR
     W --> K[Committee: 3 bounded structured role passes]
     P --> K
     E --> K
-    K --> R[HTML / Markdown / JSON investment memo]
+    K --> R[Validated PDF / HTML / Markdown / JSON memo]
     K --> Q[(Immutable decision snapshots)]
     Q --> X[Actual before/after structural replay]
 ```
@@ -32,7 +32,9 @@ flowchart LR
 | `portfolio.py` | SciPy mixed-integer optimization, normalized capital variables and binary active cheques. Enforces minimum/maximum cheque, company/sector/stage exposure, reserves and liquidity; aggregates existing duplicate exposures. Includes cash as the zero-deployment alternative. Five-candidate and five-second solver limits. |
 | `committee.py` | Three roles using one Gemini provider, validated evidence/assumption IDs, deterministic fallback, fixed readiness summary and structural snapshot diff. AI perspectives are hypotheses, not independent verification. |
 | `vcos_reports.py` | Readable escaped HTML decision memo plus Markdown/JSON with source records, supplied inputs, financial calculations, scenario assumptions and explicit limitations. Validates committee references again. |
-| `vcos_ui.py` | Seven-section Streamlit workspace, guided inputs plus full editable schemas, persistent mandate/deal context, stale allocation/committee invalidation, frozen-evidence replay. No expensive API call runs without an explicit action. |
+| `interface.py` | Shared visual helpers, explicit-submit identity search through the existing client, company catalog, overview, onboarding, action routing and company dossiers. No fabricated suggestions or automatic enrichment. |
+| `reporting_ui.py` / `pdf_reports.py` | Private local report library and cached validated exports. ReportLab produces native A4 PDFs, preserving sources and assumptions; full raw ledgers remain in JSON. |
+| `vcos_ui.py` | Streamlit decision workspace with visible sidebar navigation, guided inputs plus full editable schemas, persistent mandate/deal context, stale allocation/committee invalidation, frozen-evidence replay. No expensive API call runs without an explicit action. |
 
 All private artifacts stay below ignored `data/`. Currency conversion, liquidation preferences, SAFE/note conversion and return probabilities are not inferred. Empty financials remain `None`. Readiness does not imply financial health, absence of fraud or investment approval. Human document verification is explicitly a user attestation.
 

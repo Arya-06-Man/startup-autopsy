@@ -92,12 +92,13 @@ def thesis_draft(text):
 
 
 class Workspace:
+    KINDS=frozenset(('mandates','snapshots','watchlists','companies','comparisons','reports','preferences'))
     def __init__(self, root='data/vcos'):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
 
     def save(self, kind, value):
-        if kind not in ('mandates','snapshots','watchlists'): raise ValueError('Invalid record kind')
+        if kind not in self.KINDS: raise ValueError('Invalid record kind')
         record = dict(value)
         record.setdefault('id', uuid4().hex)
         record.setdefault('created_at', now())
@@ -111,7 +112,7 @@ class Workspace:
         return record
 
     def list(self, kind):
-        if kind not in ('mandates','snapshots','watchlists'): raise ValueError('Invalid record kind')
+        if kind not in self.KINDS: raise ValueError('Invalid record kind')
         result = []
         for path in (self.root / kind).glob('*.json'):
             try:

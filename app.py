@@ -16,33 +16,14 @@ from autopsy.vcos_ui import render
 from autopsy.risk import metric_date
 
 st.set_page_config(page_title='Startup Autopsy VCOS',page_icon='◈',layout='wide')
-st.markdown('''<style>
-.block-container{padding-top:2.5rem;max-width:1500px}h1{font-weight:650!important;letter-spacing:-.045em}h2{letter-spacing:-.025em}div[data-testid="stMetric"]{background:#121c2a;border:1px solid #263448;border-radius:12px;padding:20px}div[data-testid="stMetricLabel"]{color:#93a5bd}.eyebrow{font-size:.75rem;letter-spacing:.2em;color:#58dac2;font-weight:650}.intro{color:#93a5bd;max-width:780px;font-size:1.05rem}.stTabs [data-baseweb="tab-list"]{gap:24px}a{color:#58dac2}section[data-testid="stSidebar"]{border-right:1px solid #263448}div[data-testid="stExpander"]{border-color:#263448}
-</style>''',unsafe_allow_html=True)
-st.markdown('<style>h1{font-size:2.1rem!important}div[data-testid="stMetricValue"]{font-size:1.6rem}div[data-testid="stMetric"]{padding:16px}.stButton>button{border-radius:8px}</style>',unsafe_allow_html=True)
 settings=Settings.load(); store=Store()
-with st.sidebar:
-    st.markdown('### ◈ STARTUP AUTOPSY')
-    st.caption('VENTURE CAPITAL OPERATING SYSTEM')
-    with st.expander('Providers & investigation budgets'):
-        st.write('Crustdata: key configured' if settings.api_key else 'Crustdata: key required')
-        st.write('Gemini: key configured' if settings.gemini_key else 'AI: deterministic fallback')
-        st.caption('Model: '+(settings.gemini_model or 'gemini-3.5-flash preferred after discovery'))
-        st.caption('Configuration is not generation success. Recorded provider results appear in Evidence & Reports.')
-        settings.max_calls=st.number_input('Maximum API attempts',min_value=1,max_value=100,value=max(1,min(100,settings.max_calls)))
-        settings.max_credits=st.number_input('Estimated credit ceiling',min_value=1.0,max_value=500.0,value=float(max(1.,min(500.,settings.max_credits))))
-        settings.max_iterations=st.slider('Follow-up iterations / company',0,4,min(4,max(0,settings.max_iterations)))
-        st.caption('Enrichment reserves 5 estimated credits per call. Actual plan prices may vary; this is an estimate ceiling, not a guaranteed billing cap. Retries consume the attempt budget.')
-    st.caption('ContextCon 04 · IIT Kanpur  \nInvesting / Services, Replaced')
-
-st.markdown('<div class="eyebrow">AUTONOMOUS VENTURE CAPITAL INTELLIGENCE & DECISION PLATFORM</div>',unsafe_allow_html=True)
-st.title('Startup Autopsy VCOS')
 section=render(settings,store)
 if section not in ('Discover','Evidence & Reports'): st.stop()
-if section=='Discover':
-    if st.session_state.get('shortlist_text'):
+new_shortlist=bool(st.session_state.get('shortlist_text'))
+if section in ('Discover','Evidence & Reports'):
+    if new_shortlist:
         st.session_state['investigation_queries']=st.session_state.pop('shortlist_text')
-with st.expander('Launch investigation',expanded=not bool(store.runs())):
+with st.expander('Launch investigation',expanded=new_shortlist or not bool(store.runs())):
     left,right=st.columns([3,2])
     with left:
         text=st.text_area('Company names or domains',placeholder='retool.com\nrazorpay.com',height=130,key='investigation_queries',help='One company per line. Up to five unique companies. Domains resolve more precisely.')
@@ -69,7 +50,12 @@ with st.expander('Launch investigation',expanded=not bool(store.runs())):
                 st.session_state['requested_run_id']=run.id
                 status.update(label='Investigation saved · '+run.status,state='complete' if run.status=='complete' else 'error',expanded=False)
             if run.status=='complete':
-                st.session_state['requested_section']='Evaluate'; st.rerun()
+                resolved=[d for d in run.companies if d.company_id and d.status!='duplicate']
+                if len(resolved)==1:
+                    st.session_state['selected_company_id']=resolved[0].company_id
+                    st.session_state['requested_section']='Company Overview'
+                else: st.session_state['requested_section']='Evaluate'
+                st.rerun()
         except ValueError as exc: st.error(str(exc))
 
 if section=='Discover': st.stop()
