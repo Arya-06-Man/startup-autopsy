@@ -34,9 +34,10 @@ class Store:
         if p.exists():
             try:
                 data = json.loads(p.read_text())
-                if (datetime.now(timezone.utc) - datetime.fromisoformat(data['retrieved_at'])).total_seconds() < hours * 3600:
+                age = (datetime.now(timezone.utc) - datetime.fromisoformat(data['retrieved_at'])).total_seconds()
+                if 0 <= age < hours * 3600 and 'data' in data:
                     return data
-            except (ValueError, KeyError):
+            except (ValueError, KeyError, TypeError, OSError):
                 pass
         return None
 

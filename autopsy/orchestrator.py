@@ -44,7 +44,11 @@ def investigate(queries,api,store,planner=None,progress=None):
             stage('HYPOTHESIZE','Consider operating plan changes, roles filled and provider coverage changes.')
             if planner:
                 plan=planner.plan(d)
-                if planner.error: d.errors.append(planner.error)
+                if planner.error:
+                    d.trace.append({'stage':'LLM DIAGNOSTIC','at':now(),'detail':planner.error})
+            d.metadata['analysis_engine']='GEMINI' if plan else 'DETERMINISTIC FALLBACK'
+            d.metadata['llm_model']=planner.model if plan else None
+            d.metadata['llm_diagnostic']=planner.error if planner else 'No planner configured'
             focuses=[s.category for s in sorted(d.assessment.signals,key=lambda s:s.severity,reverse=True) if s.severity>0]
             focuses+=['leadership' if not any(e.category=='leadership_snapshot' for e in d.evidence) else 'business','business']
             if plan and plan.focus!='stop': focuses.insert(0,plan.focus)
@@ -68,7 +72,8 @@ def investigate(queries,api,store,planner=None,progress=None):
             stage('DELIVER','Dossier and source ledger saved. Follow-up drafts are never sent.')
     run.status='complete' if all(d.status in ('complete','duplicate') for d in run.companies) else 'partial'
     run.usage=api.usage()
-    if planner: run.usage.update(llm_calls=planner.calls,llm_model=planner.model)
+    run.usage['analysis_engine']='GEMINI + DETERMINISTIC CALCULATIONS' if any(d.metadata.get('analysis_engine')=='GEMINI' for d in run.companies) else 'DETERMINISTIC FALLBACK'
+    if planner: run.usage.update(llm_calls=planner.calls,llm_model=planner.model,llm_diagnostic=planner.error)
     if api.cache_hits: run.mode='CACHED REAL DATA' if not api.calls else 'LIVE DATA + CACHED REAL DATA'
     store.save(run)
     return run

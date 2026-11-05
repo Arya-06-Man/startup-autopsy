@@ -14,10 +14,25 @@ def main():
     parser=argparse.ArgumentParser(description='Startup Autopsy live investigation')
     parser.add_argument('companies',nargs='*',help='Company names or domains (up to five)')
     parser.add_argument('--check',metavar='DOMAIN',help='Make one authenticated Identify request and print normalized identity only')
+    parser.add_argument('--check-llm',action='store_true',help='Make a real structured Gemini request and print credential-safe diagnostics')
+    parser.add_argument('--check-discovery',metavar='COUNTRY',help='Search two indexed companies in a country; bypass cache')
     parser.add_argument('--output',default='data/reports')
     args=parser.parse_args()
     settings=Settings.load(); store=Store(); api=Crustdata(settings,store); planner=Planner(settings)
     try:
+        if args.check_llm:
+            from autopsy.models import Dossier
+            result=planner.plan(Dossier(query='Integration diagnostic',name='Integration diagnostic'))
+            print({'structured_response_valid':result is not None,'model':planner.model,'generation_calls':planner.calls,
+                   'attempts':planner.model_attempts,'diagnostic':planner.error or ('No GEMINI_API_KEY configured' if not settings.gemini_key else None)})
+            return 0 if result is not None else 1
+        if args.check_discovery:
+            from autopsy.discovery import search_companies
+            settings.cache_hours=0
+            result=search_companies(api,country=args.check_discovery,limit=2)
+            print({'companies':[{'id':c.get('crustdata_company_id'),'identity':c.get('basic_info')} for c in result['companies']],
+                   'mode':result['mode'],'retrieved_at':result['retrieved_at'],'has_next_page':bool(result['next_cursor'])})
+            return 0
         if args.check:
             # Disable cache: this command must actually verify authentication.
             settings.cache_hours=0

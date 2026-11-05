@@ -69,7 +69,8 @@ class Crustdata:
                 self.stopped = True
             if response.status_code == 403:
                 try:
-                    if response.json().get('error',{}).get('type') == 'insufficient_credits':
+                    error=response.json().get('error',{})
+                    if isinstance(error,dict) and error.get('type') == 'insufficient_credits':
                         self.stopped = True
                 except ValueError: pass
             if response.status_code in (429,500,502,503,504) and attempt < 2:
@@ -80,7 +81,14 @@ class Crustdata:
                 continue
             if response.is_error:
                 messages = {400:'Request rejected; check endpoint schema/field access.',401:'Invalid Crustdata API key; update .env.',402:'Crustdata credits exhausted; replenish credits.',403:'Endpoint or fields unavailable, or credits exhausted; check your Crustdata plan.',404:'No company record found.',429:'Rate limit reached; try again later.'}
-                raise ResearchError(f'Crustdata HTTP {response.status_code}: ' + messages.get(response.status_code,'Provider unavailable; retry later.'))
+                detail=''
+                if response.status_code==400:
+                    try:
+                        error=response.json().get('error',{})
+                        message=error.get('message','') if isinstance(error,dict) else str(error)
+                        detail=' '+str(message).replace(self.settings.api_key,'[redacted]')[:500]
+                    except (ValueError,AttributeError): pass
+                raise ResearchError(f'Crustdata HTTP {response.status_code}: ' + messages.get(response.status_code,'Provider unavailable; retry later.')+detail)
             try:
                 data = response.json()
             except ValueError as exc:
