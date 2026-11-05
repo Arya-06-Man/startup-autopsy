@@ -11,7 +11,7 @@
 - [x] Investor actions, founder questions and draft-only outreach
 - [x] HTML, Markdown and JSON deliverables
 - [x] Local persistence, caching, budgets, retries and partial failure handling
-- [x] 126 executed passing tests; full A–F Streamlit action workflow with mocked providers and isolated synthetic fixtures
+- [x] 129 executed passing tests; full A–F Streamlit action workflow with mocked providers and isolated synthetic fixtures
 - [x] Empty, populated and actual cached real dashboard AppTest checks
 - [x] Connected Crustdata live requests and actual-response normalization/report validation
 - [x] README, environment example, sample CSV, architecture and demo script
@@ -31,7 +31,7 @@
 - [x] Verify actual plain/structured Gemini generation, two real research plans and all three actual committee passes
 - [ ] Visual browser review at presentation resolution (browser unavailable during build)
 - [ ] Record and rehearse the actual demo
-- [ ] Verify final release commit's GitHub Actions result (reported in delivery)
+- [x] Verify GitHub Actions for pushed QA milestones; final commit result is linked in delivery
 - [x] Verify repository visibility is PUBLIC
 - [x] Public architecture diagram in docs/ARCHITECTURE.md
 - [ ] Confirm official handbook deadline and upload the actual two-minute video

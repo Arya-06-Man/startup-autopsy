@@ -102,6 +102,9 @@ def test_complete_investor_journey_a_through_f(tmp_path,monkeypatch):
     field(at,'number_input','Monthly net burn').set_value(1000000.).run()
     field(at,'selectbox','Opportunity for these modeled outcomes').set_value('1').run()
     field(at,'checkbox','I confirm these modeled assumptions apply to this opportunity').set_value(True).run()
+    field(at,'selectbox','Horizon in years').set_value(1).run()
+    assert field(at,'button','Apply outcomes and invalidate prior allocation').disabled
+    field(at,'selectbox','Horizon in years').set_value(5).run()
     click(at,'Apply outcomes and invalidate prior allocation')
     assert at.session_state['vcos_deals'][0]['downside_moic']==pytest.approx(.5)
     at.radio[0].set_value('Portfolio Lab').run()

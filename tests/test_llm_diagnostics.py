@@ -57,3 +57,21 @@ def test_factual_assertion_with_valid_reference_rejected():
     assert review(ctx,p)['engine']=='DETERMINISTIC FALLBACK'
     assert p.calls==1
     p.close()
+
+
+@pytest.mark.parametrize('surface',['planner','diagnostic'])
+def test_untrusted_model_catalog_cannot_redirect_credentialed_requests(surface):
+    requests=[]
+    def respond(req):
+        requests.append(req)
+        assert req.url.host=='generativelanguage.googleapis.com'
+        return httpx.Response(200,json={'models':[{'name':'https://untrusted.test/flash','supportedGenerationMethods':['generateContent']}]})
+    transport=httpx.MockTransport(respond)
+    if surface=='planner':
+        p=Planner(Settings(gemini_key='synthetic-secret'),transport)
+        assert p.plan(Dossier(query='synthetic')) is None and p.calls==0
+        p.close()
+    else:
+        result=gemini_probe(Settings(gemini_key='synthetic-secret'),transport=transport)
+        assert not result.get('structured_generation_verified')
+    assert len(requests)==1 and requests[0].method=='GET'

@@ -15,7 +15,7 @@ flowchart LR
     E --> C
     C --> P[Constrained mixed-integer allocation]
     U --> W[Deterministic War Room / ordinary equity]
-    W -->|explicit matched ownership/cost-basis handoff| P
+    W -->|explicit matched horizon/ownership/cost-basis handoff| P
     W --> K[Committee: 3 bounded structured role passes]
     P --> K
     E --> K
@@ -48,7 +48,7 @@ Provider failures still mark research execution partial/failed. An all-failed ru
 
 Cache reads reject future, malformed, timezone-naive and expired records and retain original retrieval dates on hits. Explicit refresh bypasses the cache and preserves prior histories. Observation, event, publication, provider update and retrieval timestamps are distinct. New dated count metrics use observation dates, with legacy event-date compatibility. Company resolution is exact-first, then secondary-name candidate discovery; only an exact domain/alias corroborates automatic selection. Manual candidates are revalidated by canonical ID and domain. Duplicate canonical IDs skip repeated enrichment.
 
-Saved decisions contain original dossiers; reopening switches visibly to frozen evidence until the user chooses current evidence. Allocation hashes cover mandate, terms and evidence; committee hashes additionally include allocation and War Room outcomes. Changed inputs cannot silently reuse an old recommendation. War Room controls recalculate locally without API requests, preserve inputs, and require an explicit ownership/cost-basis-matched action before changing a deal's modeled MOIC. Structural replay includes indexed field paths. Export validates deterministic metrics, term/source identities and allocation constraints again before rendering.
+Saved decisions contain original dossiers; reopening switches visibly to frozen evidence until the user chooses current evidence. Allocation hashes cover mandate, terms and evidence; committee hashes additionally include allocation and War Room outcomes. Changed inputs cannot silently reuse an old recommendation. War Room controls recalculate locally without API requests, preserve inputs, and require an explicit horizon/ownership/cost-basis-matched action before changing a deal's modeled MOIC. Structural replay includes indexed field paths. Export validates deterministic metrics, term/source identities and allocation constraints again before rendering.
 
 ## Preserved investigation architecture
 

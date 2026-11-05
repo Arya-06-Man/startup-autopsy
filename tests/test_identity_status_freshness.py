@@ -57,6 +57,18 @@ def test_refresh_bypasses_cache_without_rewriting_history(tmp_path):
     assert api.identify('synthetic.test')['mode']=='LIVE DATA' and api.calls==2
 
 
+def test_failed_live_attempt_does_not_turn_cached_evidence_into_live_data(tmp_path):
+    store=Store(tmp_path)
+    from autopsy.models import now
+    payload={'domains':['synthetic.test'],'exact_match':True,'fields':['basic_info']}
+    store.put_cache('/company/identify',payload,{'data':record(),'endpoint':'/company/identify','mode':'LIVE DATA','retrieved_at':now()})
+    api=Crustdata(Settings(api_key='test',max_iterations=0),store,httpx.MockTransport(lambda req:httpx.Response(403)))
+    run=investigate(['synthetic.test'],api,store)
+    assert run.status=='partial' and api.calls==1 and api.cache_hits==1
+    assert run.mode=='CACHED REAL DATA'
+    assert {e.data_mode for e in run.companies[0].evidence}=={'CACHED REAL DATA'}
+
+
 def test_all_failed_is_failed_and_history_preserved(tmp_path):
     store=Store(tmp_path)
     api=Crustdata(Settings(api_key='test'),store,httpx.MockTransport(lambda req:httpx.Response(200,json=[])))
@@ -68,13 +80,14 @@ def test_all_failed_is_failed_and_history_preserved(tmp_path):
 def test_missing_optional_data_and_llm_do_not_fail_execution(tmp_path):
     def respond(req):
         if req.url.path.startswith('/web/'): return httpx.Response(200,json={'results':[]})
-        return httpx.Response(200,json=record())
+        return httpx.Response(200,json=record(domain=None,name=None,aliases=['synthetic.test']))
     store=Store(tmp_path)
     api=Crustdata(Settings(api_key='test',max_iterations=0),store,httpx.MockTransport(respond))
     planner=Planner(Settings(gemini_key='test'),httpx.MockTransport(lambda req:httpx.Response(401)))
     run=investigate(['synthetic.test'],api,store,planner)
     d=run.companies[0]
     assert run.status=='complete' and not d.errors and d.assessment.coverage==0
+    assert d.name==d.query and d.domain==d.query and store.runs()[0].id==run.id
     assert d.metadata['llm_diagnostics']['status']=='FALLBACK'
     assert 'identity_resolution' not in d.evidence[0].value  # No derived fields in raw provider observations.
     assert company_health(d)['verification']=='Single-source; independently unverified'

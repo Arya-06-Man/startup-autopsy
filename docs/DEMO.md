@@ -42,7 +42,7 @@ Show Evaluate, the side-by-side table, 20% ownership where using the prepared ex
 
 “The allocator respects capital, reserves and concentration. It can keep all capital uninvested. In this hypothetical War Room, increasing burn changes the cash path immediately; financing after exhaustion does not rescue the modeled company.”
 
-Show Portfolio Lab's actual no-investment explanation. In War Room change burn from INR 1m to INR 2m, show month-50 exhaustion, zero-recovery output and the updated assumptions. Applying outcomes to a deal requires matched ownership/cost basis and an explicit confirmation; missing financial evidence still blocks approval.
+Show Portfolio Lab's actual no-investment explanation. In War Room change burn from INR 1m to INR 2m, show month-50 exhaustion, zero-recovery output and the updated assumptions. Applying outcomes to a deal requires matched mandate horizon, ownership and cost basis and an explicit confirmation; missing financial evidence still blocks approval.
 
 ## 1:25–1:45 — Challenge and replay
 
@@ -54,7 +54,7 @@ Show the actual Gemini/fallback status, cited arguments and approval conditions.
 
 “The output is a decision memo with the mandate, terms, modeled outcomes, opposing arguments, evidence and missing diligence. No trade or founder outreach is executed.”
 
-Download/open HTML, Markdown or JSON. Show the executive summary and source dates. State the current executed test count from README; final QA recorded 126 passing offline tests plus separate real-provider checks.
+Download/open HTML, Markdown or JSON. Show the executive summary and source dates. State the current executed test count from README; final QA recorded 129 passing offline tests plus separate real-provider checks.
 
 ## Submission gate
 

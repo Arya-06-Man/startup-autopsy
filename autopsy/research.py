@@ -21,8 +21,8 @@ def gather(api,dossier,seen=None):
     dossier.company_id=str(company['crustdata_company_id'])
     dossier.metadata=dict(company.get('basic_info') or {})
     dossier.metadata['identity_resolution']={'method':method,'requested':dossier.query,'retrieved_at':result['retrieved_at'],'mode':result['mode']}
-    dossier.name=dossier.metadata.get('name',dossier.query)
-    dossier.domain=dossier.metadata.get('primary_domain','')
+    dossier.name=dossier.metadata.get('name') or dossier.query
+    dossier.domain=dossier.metadata.get('primary_domain') or (dossier.query if '.' in dossier.query and ' ' not in dossier.query else '')
     dossier.evidence.extend(normalize_company(company,result))
     if seen and dossier.company_id in seen: return
     result=api.enrich(dossier.company_id,['basic_info','headcount.total','headcount.timeseries','hiring.openings_count','hiring.open_jobs_timeseries','funding','people.founders','people.cxos','news','updated_at'])

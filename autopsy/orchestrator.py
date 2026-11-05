@@ -84,7 +84,11 @@ def investigate(queries,api,store,planner=None,progress=None,identity_selections
         'MIXED GEMINI / DETERMINISTIC FALLBACK' if 'GEMINI' in engines else 'DETERMINISTIC FALLBACK')
     if planner: run.usage.update(llm_calls=planner.calls,llm_model=planner.model,llm_diagnostic=planner.error,llm_diagnostics=planner.diagnostics())
     run.usage['incomplete_reasons']=[{'query':d.query,'status':d.status,'reasons':d.errors} for d in run.companies if d.status not in ('complete','duplicate')]
-    if api.cache_hits: run.mode='CACHED REAL DATA' if not api.calls else 'LIVE DATA + CACHED REAL DATA'
+    source_modes={e.data_mode for d in run.companies for e in d.evidence}
+    if {'LIVE DATA','CACHED REAL DATA'}<=source_modes: run.mode='LIVE DATA + CACHED REAL DATA'
+    elif 'LIVE DATA' in source_modes: run.mode='LIVE DATA'
+    elif 'CACHED REAL DATA' in source_modes: run.mode='CACHED REAL DATA'
+    else: run.mode='UNKNOWN PROVENANCE'
     if not any(d.evidence for d in run.companies): run.mode='NO USABLE EVIDENCE'
     store.save(run)
     return run

@@ -6,7 +6,7 @@ from typing import Literal
 import httpx
 from pydantic import BaseModel, Field, ConfigDict, ValidationError
 from autopsy.evidence import validate_refs
-from autopsy.diagnostics import safe_failure
+from autopsy.diagnostics import safe_failure,valid_model_name
 
 class Hypothesis(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -50,7 +50,7 @@ class Planner:
             if self.error: return None
             if not self.model:
                 response=self.http.get('models'); response.raise_for_status()
-                models=[m['name'] for m in response.json().get('models',[]) if 'generateContent' in m.get('supportedGenerationMethods',[])]
+                models=[m['name'] for m in response.json().get('models',[]) if isinstance(m,dict) and valid_model_name(m.get('name')) and 'generateContent' in m.get('supportedGenerationMethods',[])]
                 requested=self.settings.gemini_model.removeprefix('models/')
                 eligible=[m for m in models if (m=='models/'+requested if requested else 'flash' in m and 'image' not in m and 'tts' not in m)]
                 if not eligible: raise ValueError('No compatible configured Gemini model supports generateContent.')

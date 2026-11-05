@@ -1,6 +1,11 @@
 """Small, credential-safe provider probes. No retries, company data or tool claims."""
 import time
+import re
 import httpx
+
+
+def valid_model_name(name):
+    return isinstance(name,str) and re.fullmatch(r'models/[A-Za-z0-9._-]+',name) is not None
 
 
 def safe_failure(response, secret=''):
@@ -47,7 +52,7 @@ def gemini_probe(settings, model='', transport=None):
             return None
         data=call('discovery','models')
         if not data: return result
-        names=[m['name'] for m in data.get('models',[]) if 'generateContent' in m.get('supportedGenerationMethods',[]) and 'flash' in m.get('name','') and not any(x in m['name'] for x in ('tts','image'))]
+        names=[m['name'] for m in data.get('models',[]) if isinstance(m,dict) and valid_model_name(m.get('name')) and 'generateContent' in m.get('supportedGenerationMethods',[]) and 'flash' in m['name'] and not any(x in m['name'] for x in ('tts','image'))]
         result['advertised_models']=names
         chosen=(model or settings.gemini_model).removeprefix('models/')
         selected='models/'+chosen if chosen else next((m for m in names if m=='models/gemini-flash-lite-latest'),next(iter(names),''))

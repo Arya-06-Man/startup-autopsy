@@ -52,10 +52,18 @@ An uncached exact `notion.so` Identify check still had no validated domain match
 
 ## Release checks and remaining gates
 
-Full suite: **126 tests passed** before the final documentation checkpoint; compilation and `git diff --check` passed. Dependency consistency check reported no broken requirements. Final checkpoint results and CI are recorded in the delivery response.
+Full suite: **129 tests passed** before the final documentation checkpoint; compilation and `git diff --check` passed. Dependency consistency check reported no broken requirements. Final checkpoint results and CI are recorded in the delivery response.
 
 The local Streamlit server health endpoint returned **HTTP 200 / ok**. Browser skill setup reported no available browser, and discovery returned an empty browser list. Therefore no visual inspection or video recording is claimed. The repository was verified **PUBLIC** through GitHub. Architecture and demo instructions are publicly accessible repository documents. Actual deadline/video-upload status must be confirmed by the submitting team; neither was invented.
 
 Known boundaries: hypotheses are not verified facts; no automatic semantic truth verification, SAFE/note/preferred conversion, legal waterfall, financial-document extraction, multi-round cap table or production authentication. Current scenario stress covers new allocations; existing holdings affect concentration and budget. The optimizer does not silently renegotiate an out-of-mandate proposed cheque. No trades or outreach are executed.
 
-Final malformed-provider regression sweep: four new tests first reproduced failures for malformed nested identity, funding, web-search and fetched-page records. Shape validation now turns these into explicit per-company/page errors, preserves subsequent readable pages, and continues later companies. The complete suite reached **126 passing tests**. No provider request contract changed in this hardening step.
+Final malformed-provider regression sweep: four new tests first reproduced failures for malformed nested identity, funding, web-search and fetched-page records. Shape validation now turns these into explicit per-company/page errors, preserves subsequent readable pages, and continues later companies. The complete suite reached **129 passing tests**. No provider request contract changed in this hardening step.
+
+Final provenance regression: a failed live Enrich attempt after a cached Identify result previously labeled the run as mixed live/cached, although all accepted evidence was cached. A failing test reproduced it. Run provenance now derives from accepted evidence modes, while failed live attempts remain explicit in usage/errors. Final suite: **129 passed**.
+
+Credential-boundary tests also verify untrusted model-catalog names cannot redirect a credentialed generation request to another host. Both diagnostics and generation accept only `models/<safe-name>` paths under the fixed Google endpoint. The final suite includes these two negative tests: **129 passed**.
+
+The full UI journey also verifies a scenario from a different time horizon cannot be applied to a deal under the current mandate; ownership and cost basis must match as well. This prevents silently comparing outcomes across incompatible horizons.
+
+Nullable provider names/domains are retained as unknown in the raw ledger. Dossier display fields fall back to the validated lookup/alias, preventing an otherwise completed run from being dropped during typed archive loading. This is covered by the optional-data/persistence regression.

@@ -523,9 +523,10 @@ def scenario_to_opportunity(outcomes):
         deal=next(d for d in deals if d.company_id==cid)
         inputs=outcomes['Base']['assumptions']
         metrics=deal_metrics(deal)
-        matching=(metrics['ownership'] is not None and abs(inputs['ownership']-metrics['ownership'])<1e-8 and abs(inputs['invested']-deal.investment)<.01 and deal.investment>0)
-        st.caption('Requires ordinary-equity entry ownership and cost basis matching the supplied opportunity. Applying outcomes changes modeled MOIC only; it does not overwrite financial evidence or legal terms.')
-        if not matching: st.warning('Match current ownership and total investor cost basis to this opportunity before applying outcomes.')
+        mandate=Mandate.model_validate(st.session_state['mandate']) if st.session_state.get('mandate') else None
+        matching=(mandate is not None and inputs['years']==mandate.horizon_years and metrics['ownership'] is not None and abs(inputs['ownership']-metrics['ownership'])<1e-8 and abs(inputs['invested']-deal.investment)<.01 and deal.investment>0)
+        st.caption('Requires the mandate horizon, ordinary-equity entry ownership and cost basis to match. Applying outcomes changes modeled MOIC only; it does not overwrite financial evidence or legal terms.')
+        if not matching: st.warning('Match the mandate horizon, current ownership and total investor cost basis before applying outcomes.')
         confirmed=st.checkbox('I confirm these modeled assumptions apply to this opportunity')
         if st.button('Apply outcomes and invalidate prior allocation',disabled=not (matching and confirmed)):
             values={'downside_moic':outcomes['Downside']['moic'],'base_moic':outcomes['Base']['moic'],'upside_moic':outcomes['Upside']['moic']}
