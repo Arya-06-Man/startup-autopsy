@@ -57,6 +57,9 @@ def fetch_lead(api,dossier,leads):
     if not isinstance(result['data'],list): raise ResearchError('Unexpected web fetch response.')
     successful=set()
     for row in result['data']:
+        if not isinstance(row,dict):
+            dossier.errors.append('Malformed fetched document record; other readable pages are retained.')
+            continue
         if not row.get('success') or row.get('url') not in urls: continue
         successful.add(row['url'])
         parser=TextParser(); parser.feed(row.get('content') or '')

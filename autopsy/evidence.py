@@ -21,15 +21,21 @@ def normalize_company(company, result):
     cid=str(company['crustdata_company_id'])
     source=f"https://api.crustdata.com{result['endpoint']}#company={cid}"
     evidence=[]
-    updated=(company.get('metadata') or {}).get('updated_at') or company.get('updated_at')
+    def object_section(key):
+        value=company.get(key)
+        if value is None: return {}
+        if not isinstance(value,dict): raise ValueError('Malformed provider '+key+' section; expected an object.')
+        return value
+    updated=object_section('metadata').get('updated_at') or company.get('updated_at')
     def add(category,fact,value,event_date=None,suffix='',observation_date=None):
         evidence.append(Evidence(company_id=cid,category=category,fact=fact,value=value,
             source=source+suffix,event_date=valid_date(event_date),observation_date=valid_date(observation_date),
             provider_updated_at=updated,data_mode=result.get('mode','Unknown'),retrieved_at=result['retrieved_at']))
-    if company.get('basic_info'):
-        add('identity','Resolved company identity and provider metadata',company['basic_info'])
+    basic=object_section('basic_info')
+    if basic:
+        add('identity','Resolved company identity and provider metadata',basic)
     for section,key,category in [('headcount','employee_count','workforce'),('hiring','open_jobs','hiring')]:
-        obj=company.get(section) or {}
+        obj=object_section(section)
         rows=obj.get('timeseries' if section=='headcount' else 'open_jobs_timeseries') or []
         if isinstance(rows,list):
             for row in rows:
@@ -38,13 +44,13 @@ def normalize_company(company, result):
         current=obj.get('total' if section=='headcount' else 'openings_count')
         if number(current):
             add(category+'_snapshot','Current provider snapshot (effective date unknown)',current,suffix='/'+section)
-    funding=company.get('funding') or {}
+    funding=object_section('funding')
     if funding:
         add('funding_snapshot','Provider funding summary; funding silence does not establish a cash shortage',funding, suffix='/funding')
     for row in funding.get('milestones') or []:
         if isinstance(row,dict):
             add('funding','Provider funding milestone',row,row.get('funding_date') or row.get('date'),'/funding')
-    people=company.get('people') or {}
+    people=object_section('people')
     if isinstance(people,dict):
         for group in ('founders','cxos','decision_makers'):
             for row in people.get(group) or []:
@@ -67,6 +73,7 @@ def normalize_search(result,cid):
     data=result['data']
     if not isinstance(data,dict) or data.get('success') is False:
         raise ValueError('Web search returned an unsuccessful or unexpected response.')
+    if not isinstance(data.get('results'),list): raise ValueError('Malformed web search results; expected a list.')
     evidence=[]
     for row in data.get('results',[])[:10]:
         if not isinstance(row,dict) or not safe_url(row.get('url','')): continue

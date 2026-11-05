@@ -11,7 +11,7 @@
 - [x] Investor actions, founder questions and draft-only outreach
 - [x] HTML, Markdown and JSON deliverables
 - [x] Local persistence, caching, budgets, retries and partial failure handling
-- [x] 122 executed passing tests; full A–F Streamlit action workflow with mocked providers and isolated synthetic fixtures
+- [x] 126 executed passing tests; full A–F Streamlit action workflow with mocked providers and isolated synthetic fixtures
 - [x] Empty, populated and actual cached real dashboard AppTest checks
 - [x] Connected Crustdata live requests and actual-response normalization/report validation
 - [x] README, environment example, sample CSV, architecture and demo script

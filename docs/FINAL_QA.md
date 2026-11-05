@@ -52,8 +52,10 @@ An uncached exact `notion.so` Identify check still had no validated domain match
 
 ## Release checks and remaining gates
 
-Full suite: **122 tests passed** before the final documentation checkpoint; compilation and `git diff --check` passed. Dependency consistency check reported no broken requirements. Final checkpoint results and CI are recorded in the delivery response.
+Full suite: **126 tests passed** before the final documentation checkpoint; compilation and `git diff --check` passed. Dependency consistency check reported no broken requirements. Final checkpoint results and CI are recorded in the delivery response.
 
 The local Streamlit server health endpoint returned **HTTP 200 / ok**. Browser skill setup reported no available browser, and discovery returned an empty browser list. Therefore no visual inspection or video recording is claimed. The repository was verified **PUBLIC** through GitHub. Architecture and demo instructions are publicly accessible repository documents. Actual deadline/video-upload status must be confirmed by the submitting team; neither was invented.
 
 Known boundaries: hypotheses are not verified facts; no automatic semantic truth verification, SAFE/note/preferred conversion, legal waterfall, financial-document extraction, multi-round cap table or production authentication. Current scenario stress covers new allocations; existing holdings affect concentration and budget. The optimizer does not silently renegotiate an out-of-mandate proposed cheque. No trades or outreach are executed.
+
+Final malformed-provider regression sweep: four new tests first reproduced failures for malformed nested identity, funding, web-search and fetched-page records. Shape validation now turns these into explicit per-company/page errors, preserves subsequent readable pages, and continues later companies. The complete suite reached **126 passing tests**. No provider request contract changed in this hardening step.

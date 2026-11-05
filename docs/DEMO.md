@@ -54,7 +54,7 @@ Show the actual Gemini/fallback status, cited arguments and approval conditions.
 
 “The output is a decision memo with the mandate, terms, modeled outcomes, opposing arguments, evidence and missing diligence. No trade or founder outreach is executed.”
 
-Download/open HTML, Markdown or JSON. Show the executive summary and source dates. State the current executed test count from README; final QA recorded 122 passing offline tests plus separate real-provider checks.
+Download/open HTML, Markdown or JSON. Show the executive summary and source dates. State the current executed test count from README; final QA recorded 126 passing offline tests plus separate real-provider checks.
 
 ## Submission gate
 

@@ -121,7 +121,15 @@ def candidates(response):
             if not isinstance(match,dict): raise ResearchError('Malformed company match.')
             company=match.get('company_data') or {}
             if not isinstance(company,dict): raise ResearchError('Malformed company data.')
+            basic=company.get('basic_info')
+            if basic is not None and not isinstance(basic,dict): raise ResearchError('Malformed company basic_info; expected an object.')
+            if isinstance(basic,dict):
+                for field in ('name','primary_domain'):
+                    if basic.get(field) is not None and not isinstance(basic[field],str): raise ResearchError('Malformed company '+field+'.')
+                if basic.get('all_domains') is not None and not isinstance(basic['all_domains'],list): raise ResearchError('Malformed company domain aliases.')
             if company.get('crustdata_company_id') is not None:
+                cid=company['crustdata_company_id']
+                if isinstance(cid,bool) or not str(cid).isdigit(): raise ResearchError('Malformed canonical company ID.')
                 result.append(company)
     return result
 
@@ -136,8 +144,8 @@ def resolve(response, query):
     unique={str(m['crustdata_company_id']):m for m in matches}
     if not unique: raise ResearchError('No exact company match. Try its primary website domain.')
     if len(unique)>1:
-        names=', '.join(m.get('basic_info',{}).get('name','Unknown') + ' (' + str(m.get('basic_info',{}).get('primary_domain','')) + ')' for m in unique.values())
+        names=', '.join(str((m.get('basic_info') or {}).get('name') or 'Unknown') + ' (' + str((m.get('basic_info') or {}).get('primary_domain') or '') + ')' for m in unique.values())
         raise ResearchError('Ambiguous company identity. Enter a specific domain. Candidates: ' + names)
-    if not ('.' in query and ' ' not in query) and (next(iter(unique.values())).get('basic_info',{}).get('name') or '').casefold().strip()!=query.casefold().strip():
+    if not ('.' in query and ' ' not in query) and ((next(iter(unique.values())).get('basic_info') or {}).get('name') or '').casefold().strip()!=query.casefold().strip():
         raise ResearchError('Company name is not an exact match; disambiguate explicitly.')
     return next(iter(unique.values()))

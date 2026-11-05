@@ -69,7 +69,7 @@ def investigate(queries,api,store,planner=None,progress=None,identity_selections
             d.evidence=verify(d.evidence); d.assessment=assess(d.evidence)
             stage('ASSESS',d.assessment.label+'; missing evidence is not safety.')
             d.status='partial' if d.errors else 'complete'
-        except (ResearchError,ValueError,TypeError,KeyError) as exc:
+        except (ResearchError,ValueError,TypeError,KeyError,AttributeError) as exc:
             if isinstance(exc,IdentityError): d.metadata['identity_candidates']=exc.options
             d.errors.append(str(exc)); d.status='partial' if d.evidence else 'failed'
             d.evidence=verify(d.evidence); d.assessment=assess(d.evidence)
