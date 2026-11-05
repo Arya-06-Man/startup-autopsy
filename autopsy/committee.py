@@ -30,7 +30,8 @@ def context(mandate,deals,dossiers,allocation=None):
             for hypothesis in dossier.advice.get('hypotheses',[]): validate_refs(hypothesis['evidence_ids'],dossier.evidence)
             for e in dossier.evidence:
                 refs[e.id]={'type':e.status,'fact':e.fact,'value':e.value,'company_id':e.company_id,
-                            'source':e.source,'observed':e.event_date,'published':e.publication_date,'retrieved':e.retrieved_at,'limitations':e.limitations}
+                            'source':e.source,'observed':e.observation_date,'event':e.event_date,'published':e.publication_date,
+                            'provider_updated':e.provider_updated_at,'retrieved':e.retrieved_at,'data_mode':e.data_mode,'limitations':e.limitations}
     return {'created_at':now(),'mandate':mandate.model_dump(mode='json'),
             'deals':[{'terms':d.model_dump(mode='json'),'metrics':deal_metrics(d),
                       'readiness':readiness(mandate,d,dossiers.get(d.company_id))} for d in deals],

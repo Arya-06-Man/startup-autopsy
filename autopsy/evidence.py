@@ -21,9 +21,11 @@ def normalize_company(company, result):
     cid=str(company['crustdata_company_id'])
     source=f"https://api.crustdata.com{result['endpoint']}#company={cid}"
     evidence=[]
-    def add(category,fact,value,event_date=None,suffix=''):
+    updated=(company.get('metadata') or {}).get('updated_at') or company.get('updated_at')
+    def add(category,fact,value,event_date=None,suffix='',observation_date=None):
         evidence.append(Evidence(company_id=cid,category=category,fact=fact,value=value,
-            source=source+suffix,event_date=valid_date(event_date),retrieved_at=result['retrieved_at']))
+            source=source+suffix,event_date=valid_date(event_date),observation_date=valid_date(observation_date),
+            provider_updated_at=updated,data_mode=result.get('mode','Unknown'),retrieved_at=result['retrieved_at']))
     if company.get('basic_info'):
         add('identity','Resolved company identity and provider metadata',company['basic_info'])
     for section,key,category in [('headcount','employee_count','workforce'),('hiring','open_jobs','hiring')]:
@@ -32,7 +34,7 @@ def normalize_company(company, result):
         if isinstance(rows,list):
             for row in rows:
                 if isinstance(row,dict) and number(row.get(key)) and valid_date(row.get('date')):
-                    add(category,f"Provider {key}: {row[key]}",row[key],row['date'],suffix='/'+section)
+                    add(category,f"Provider {key}: {row[key]}",row[key],observation_date=row['date'],suffix='/'+section)
         current=obj.get('total' if section=='headcount' else 'openings_count')
         if number(current):
             add(category+'_snapshot','Current provider snapshot (effective date unknown)',current,suffix='/'+section)
@@ -51,6 +53,13 @@ def normalize_company(company, result):
     news=company.get('news')
     if news:
         add('business_raw','Provider news section; requires article-level review',news,suffix='/news')
+        if isinstance(news,list):
+            for row in news:
+                if isinstance(row,dict) and safe_url(row.get('article_url','')):
+                    evidence.append(Evidence(company_id=cid,category='news_observation',fact=str(row.get('article_title') or 'Provider news lead'),
+                        value=row,source=row['article_url'],publication_date=valid_date(row.get('article_publish_date')),
+                        provider_updated_at=updated,data_mode=result.get('mode','Unknown'),retrieved_at=result['retrieved_at'],
+                        status='unknown',limitations='Provider news lead, not a verified company event. Publication does not establish event date.'))
     return evidence
 
 
@@ -64,6 +73,7 @@ def normalize_search(result,cid):
         evidence.append(Evidence(company_id=cid, category='research_lead',
             fact=str(row.get('title') or 'Search result'),value=row,source=row['url'],
             publication_date=valid_date(row.get('publication_date')),retrieved_at=result['retrieved_at'],
+            data_mode=result.get('mode','Unknown'),
             status='unknown', limitations='Search lead; snippet may be incomplete or misattributed. Not an established company event.'))
     return evidence
 
@@ -85,13 +95,13 @@ def canonical_url(url):
 def verify(evidence):
     seen={}; unique=[]
     for item in evidence:
-        key=(item.company_id,item.category,item.event_date,json.dumps(item.value,sort_keys=True),canonical_url(item.source))
+        key=(item.company_id,item.category,item.observation_date or item.event_date,json.dumps(item.value,sort_keys=True),canonical_url(item.source))
         if key not in seen:
             unique.append(item); seen[key]=item.id
     groups={}
     for e in unique:
-        if e.category in ('workforce','hiring') and e.event_date:
-            groups.setdefault((e.company_id,e.category,e.event_date),[]).append(e)
+        if e.category in ('workforce','hiring') and (e.observation_date or e.event_date):
+            groups.setdefault((e.company_id,e.category,e.observation_date or e.event_date),[]).append(e)
     for items in groups.values():
         if len({json.dumps(e.value,sort_keys=True) for e in items}) > 1:
             for e in items:

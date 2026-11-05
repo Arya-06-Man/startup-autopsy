@@ -35,8 +35,8 @@ def markdown(run):
         lines += ['- '+x for x in d.advice.get('next_steps',[])]
         lines += ['### Founder questions']+['- '+q for q in d.advice.get('questions',[])]
         lines += ['### Draft email — not sent',d.advice.get('email',''),d.advice.get('runway','Runway cannot be estimated from available evidence.'),'### Evidence ledger']
-        for e in sorted(d.evidence,key=lambda e:e.event_date or e.publication_date or e.retrieved_at):
-            lines += [f'- **{e.id}** | {e.category} | {e.status} | Event: {e.event_date or "unknown"} | Published: {e.publication_date or "unknown"} | Retrieved: {e.retrieved_at}',
+        for e in sorted(d.evidence,key=lambda e:e.observation_date or e.event_date or e.publication_date or e.retrieved_at):
+            lines += [f'- **{e.id}** | {e.category} | {e.status} | Observation: {e.observation_date or "unknown"} | Event: {e.event_date or "unknown"} | Published: {e.publication_date or "unknown"} | Provider updated: {e.provider_updated_at or "unknown"} | Retrieved: {e.retrieved_at} | {e.data_mode}',
                       f'  {e.fact}',f'  Source: {e.provider} — {e.source}',f'  Original value: {json.dumps(e.value,ensure_ascii=False)}',f'  Limitations: {e.limitations}; Conflicts: {e.conflicts}; Corroboration: {e.corroborating_ids}']
         lines += ['### Limitations and errors']+['- '+e for e in d.errors]
         lines += ['### Investigation decisions']+['- '+t['stage']+': '+t['detail'] for t in d.trace]

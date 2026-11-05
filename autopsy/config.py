@@ -13,6 +13,7 @@ class Settings:
     cache_hours: float = 24
     gemini_key: str = ''
     gemini_model: str = ''
+    refresh_data: bool = False
 
     @classmethod
     def load(cls):

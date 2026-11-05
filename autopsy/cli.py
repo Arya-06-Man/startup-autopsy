@@ -20,10 +20,15 @@ def main():
     parser.add_argument('--diagnose-llm',action='store_true',help='Bounded discovery, plain text and minimal structured generation probes')
     parser.add_argument('--model',default='',help='Explicit Gemini model for diagnostics/checks; does not modify .env')
     parser.add_argument('--check-committee',action='store_true',help='Run three real role passes with explicitly synthetic diagnostic assumptions')
+    parser.add_argument('--fresh',action='store_true',help='Bypass response cache; preserve previous run history')
+    parser.add_argument('--iterations',type=int,choices=range(5),help='Bound follow-up searches per company (0–4)')
+    parser.add_argument('--no-llm',action='store_true',help='Explicit deterministic investigation; no generation calls')
     parser.add_argument('--output',default='data/reports')
     args=parser.parse_args()
     settings=Settings.load(); store=Store(); api=Crustdata(settings,store); planner=Planner(settings)
     if args.model: settings.gemini_model=args.model
+    if args.fresh: settings.refresh_data=True
+    if args.iterations is not None: settings.max_iterations=args.iterations
     try:
         if args.check_committee:
             from autopsy.committee import context,review
@@ -74,7 +79,7 @@ def main():
             print({'company_id':company['crustdata_company_id'],'name':basic.get('name'),'domain':basic.get('primary_domain'),'mode':result['mode']})
             return 0
         queries=ingest('\n'.join(args.companies))
-        run=investigate(queries,api,store,planner,lambda company,stage,detail:print(f'{company} | {stage} | {detail}'))
+        run=investigate(queries,api,store,None if args.no_llm else planner,lambda company,stage,detail:print(f'{company} | {stage} | {detail}'))
         root=Path(args.output); root.mkdir(parents=True,exist_ok=True)
         for suffix,content in [('html',reports.html(run)),('md',reports.markdown(run)),('json',reports.ledger(run))]:
             (root/f'{run.id}.{suffix}').write_text(content)

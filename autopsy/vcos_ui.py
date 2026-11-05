@@ -12,6 +12,9 @@ from autopsy.vcos_reports import export
 from autopsy.discovery import search_companies, rows
 from autopsy.api import Crustdata, ResearchError
 from autopsy.llm import Planner
+from autopsy.identity import identify_company,IdentityError,candidate_rows
+from autopsy.health import company_health
+from autopsy.models import Dossier
 
 NAV=['Overview','Discover','Evaluate','Portfolio Lab','War Room','Investment Committee','Evidence & Reports']
 
@@ -22,6 +25,10 @@ def parsed_editor(label,value,key,height=220):
 
 def render(settings,store):
     workspace=Workspace()
+    if st.session_state.get('requested_section'):
+        st.session_state['vcos_section']=st.session_state.pop('requested_section')
+    if st.session_state.get('requested_run_id'):
+        st.session_state['evidence_run_id']=st.session_state.pop('requested_run_id')
     section=st.sidebar.radio('Workspace',NAV,key='vcos_section')
     saved=workspace.mandates()
     if 'mandate' not in st.session_state and saved:
@@ -29,12 +36,12 @@ def render(settings,store):
     mandate=Mandate.model_validate(st.session_state.mandate) if st.session_state.get('mandate') else None
     runs=store.runs()
     if runs:
-        run_id=st.sidebar.selectbox('Evidence context',[r.id for r in runs],format_func=lambda value:next(', '.join(d.name or d.query for d in r.companies)+' · '+r.created_at[:10] for r in runs if r.id==value))
+        if st.session_state.get('evidence_run_id') not in [r.id for r in runs]: st.session_state.pop('evidence_run_id',None)
+        run_id=st.sidebar.selectbox('Evidence context',[r.id for r in runs],key='evidence_run_id',format_func=lambda value:next(', '.join(d.name or d.query for d in r.companies)+' · '+r.created_at[:10] for r in runs if r.id==value))
         run=next(r for r in runs if r.id==run_id)
         dossiers={d.company_id:d for d in run.companies if d.company_id and d.status!='duplicate'}
     else: dossiers={}; run=None
     if st.session_state.get('replay_dossiers') is not None:
-        from autopsy.models import Dossier
         dossiers={cid:Dossier.model_validate(d) for cid,d in st.session_state['replay_dossiers'].items()}
         st.sidebar.info('Frozen evidence from decision replay')
         if st.sidebar.button('Return to current evidence'):
@@ -65,11 +72,12 @@ def render(settings,store):
             a,b=st.columns(2)
             head=a.number_input('Minimum headcount',min_value=0,value=0)
             growth=b.text_input('Minimum 6m headcount growth % (optional)')
+            refresh=st.checkbox('Refresh discovery data',help='Bypass the response cache for this explicit search. Existing investigation histories are retained.')
             search=st.form_submit_button('Search Crustdata',disabled=not settings.api_key,type='primary')
         filters=dict(industry=industry,country=country,stage=stage,min_headcount=head,growth=float(growth) if growth.strip() and _is_number(growth) else None)
         if search:
             if growth.strip() and not _is_number(growth): st.error('Growth must be a number')
-            else: discovery_request(settings,store,filters)
+            else: discovery_request(settings,store,filters,refresh=refresh)
         page=st.session_state.get('discovery_page')
         if page:
             st.caption(f'{page["mode"]} · retrieved {page["retrieved_at"]} · why included: {json.dumps(page["filters"])}')
@@ -80,6 +88,15 @@ def render(settings,store):
             selected=st.multiselect('Shortlist 2–5 companies for deep diligence',options,max_selections=5)
             if selected: st.session_state['shortlist_text']='\n'.join(selected)
             st.caption('Selected domains populate the investigation input below. Launch explicitly to spend enrichment credits.')
+            if st.button('Add selected to evaluation',disabled=not selected,type='primary'):
+                pool=st.session_state.get('evaluation_pool',{})
+                for row in table:
+                    if row['Domain'] in selected and row['ID']:
+                        pool[row['ID']]={'name':row['Company'],'domain':row['Domain']}
+                if len(pool)>5: st.error('Keep at most five evaluation candidates. Remove existing opportunities before adding more.')
+                else:
+                    st.session_state['evaluation_pool']=pool
+                    st.session_state['requested_section']='Evaluate'; st.rerun()
             if page.get('next_cursor') and st.button('Next search page'):
                 discovery_request(settings,store,st.session_state['discovery_filters'],page['next_cursor']); st.rerun()
             name=st.text_input('Watchlist name')
@@ -94,13 +111,22 @@ def render(settings,store):
                     st.session_state['shortlist_text']='\n'.join(watchlists[chosen]['domains']); st.rerun()
         st.divider()
         st.subheader('Investigate your shortlist')
+        identity_controls(settings,store)
         return section
     elif section=='Evaluate':
         st.subheader('Deal comparison arena')
         st.caption('Enter supplied terms in mandate currency. Unknown values stay blank. Financials are annual revenue and current monthly net burn; no company metrics are prefilled.')
         if not mandate: st.info('Save a mandate in Overview first.'); return section
-        options=list(dossiers)
-        selected=st.multiselect('Companies from evidence context',options,default=[d.company_id for d in deals if d.company_id in options],format_func=lambda cid:dossiers[cid].name or dossiers[cid].query,max_selections=5)
+        pool={cid:Dossier(query=item['domain'],company_id=cid,name=item['name'] or item['domain'],domain=item['domain']) for cid,item in st.session_state.get('evaluation_pool',{}).items()}
+        available=pool|dossiers
+        options=list(available)
+        defaults=list(dict.fromkeys([d.company_id for d in deals if d.company_id in options]+list(pool)))[:5]
+        selected=st.multiselect('Companies from evidence context',options,default=defaults,format_func=lambda cid:available[cid].name or available[cid].query,max_selections=5)
+        if pool and any(cid not in dossiers for cid in selected):
+            st.info('Discovery candidates are selected for evaluation. Launch their dossier investigations in Discover before an allocation can become reviewable.')
+            if st.button('Investigate evaluation candidates'):
+                st.session_state['shortlist_text']='\n'.join(available[cid].domain for cid in selected)
+                st.session_state['requested_section']='Discover'; st.rerun()
         manual=st.text_area('Or add company domains for a terms-only comparison',help='One per line; no external evidence is implied. Up to five combined companies.')
         manual_ids=[x.strip().lower() for x in manual.splitlines() if x.strip()]
         ids=list(dict.fromkeys(selected+manual_ids))
@@ -115,8 +141,8 @@ def render(settings,store):
                 'rejection_reviewed':False,'downside_moic':None,'base_moic':None,'upside_moic':None}))
         if ids:
             with st.expander('Guided deal editor',expanded=True):
-                cid=st.selectbox('Edit opportunity',ids,format_func=lambda value:dossiers[value].name if value in dossiers else value)
-                guided_deal_editor(cid,mandate,dossiers,previous)
+                cid=st.selectbox('Edit opportunity',ids,format_func=lambda value:available[value].name if value in available else value)
+                guided_deal_editor(cid,mandate,available,previous)
         if st.button('Prepare editable deal terms',disabled=not ids):
             st.session_state['terms_json']=json.dumps(templates,indent=2,ensure_ascii=False)
         if 'terms_json' in st.session_state:
@@ -211,6 +237,11 @@ def render(settings,store):
         if run:
             st.caption('Execution: '+run.status.upper()+' · Engine: '+run.usage.get('analysis_engine','Legacy run: see decision trace')+' · '+run.mode)
             st.caption('Evidence coverage is a separate measurement. Decision confidence is uncalibrated; committee readiness requires primary financial and legal review.')
+            st.dataframe(pd.DataFrame([{'Company':d.name or d.query,**{k:v for k,v in company_health(d).items() if k in ('execution','coverage_percent','verification','latest_observation','provider_updated_at','retrieved_at')}} for d in run.companies]),hide_index=True,width='stretch')
+            for d in run.companies:
+                if d.errors: st.warning((d.name or d.query)+': '+'; '.join(d.errors))
+            with st.expander('Model generation diagnostics · recorded for this investigation'):
+                st.json(run.usage.get('llm_diagnostics',{'status':'Legacy run; inspect original trace and diagnostics'}))
         return section
     return section
 
@@ -486,11 +517,49 @@ def _is_number(value):
 def _csv(value): return list(dict.fromkeys(x.strip() for x in value.split(',') if x.strip()))
 
 
-def discovery_request(settings,store,filters,cursor=None):
-    api=Crustdata(settings,store)
+def discovery_request(settings,store,filters,cursor=None,refresh=False):
+    from dataclasses import replace
+    api=Crustdata(replace(settings,refresh_data=refresh),store)
     try:
         with st.spinner('Querying Crustdata company index'):
             st.session_state['discovery_page']=search_companies(api,**filters,cursor=cursor)
             st.session_state['discovery_filters']=filters
     except (ResearchError,ValueError,TypeError) as exc: st.error(str(exc))
     finally: api.close()
+
+
+def identity_controls(settings,store):
+    with st.expander('Resolve or disambiguate company identity'):
+        st.caption('Exact domain first. Secondary name results are candidates until a domain/alias is validated or you explicitly confirm a canonical identity. No enrichment is performed here.')
+        query=st.text_input('Identity domain or company name',key='identity_query')
+        hint=st.text_input('Company name for secondary lookup (optional)',key='identity_hint')
+        refresh=st.checkbox('Refresh identity lookup',key='identity_refresh')
+        if st.button('Check identity',disabled=not query):
+            from dataclasses import replace
+            api=Crustdata(replace(settings,refresh_data=refresh),store)
+            try:
+                company,result,method=identify_company(api,query,name_hint=hint)
+                st.session_state['identity_options']=candidate_rows(result)
+                st.success(method+' · '+str((company.get('basic_info') or {}).get('name')))
+                st.session_state['identity_options_query']=query
+            except IdentityError as exc:
+                st.session_state['identity_options']=exc.options
+                st.session_state['identity_options_query']=query
+                st.warning(str(exc))
+            except (ResearchError,ValueError) as exc: st.error(str(exc))
+            finally: api.close()
+        options=st.session_state.get('identity_options',[])
+        if options:
+            st.dataframe(pd.DataFrame(options),hide_index=True,width='stretch')
+            valid=[r for r in options if r.get('domain')]
+            if valid:
+                chosen=st.selectbox('Candidate to confirm',range(len(valid)),format_func=lambda i:f'{valid[i]["name"]} · {valid[i]["domain"]} · ID {valid[i]["company_id"]}')
+                confirm=st.checkbox('I compared the candidate name and primary domain and confirm this identity')
+                if st.button('Use confirmed company identity',disabled=not confirm):
+                    from autopsy.ingestion import normalize
+                    original=normalize(st.session_state['identity_options_query'])
+                    selections=dict(st.session_state.get('identity_selections',{}))
+                    selections[original]={'company_id':valid[chosen]['company_id'],'domain':valid[chosen]['domain']}
+                    st.session_state['identity_selections']=selections
+                    st.session_state['shortlist_text']=original
+                    st.success('Identity selected. Launch investigation below; canonical ID and domain are checked again.')

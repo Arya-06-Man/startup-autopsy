@@ -3,6 +3,7 @@ from autopsy.api import ResearchError
 from autopsy.research import gather,search_focus,fetch_lead
 from autopsy.evidence import verify
 from autopsy.risk import assess
+from autopsy.identity import IdentityError
 
 
 def actions(dossier,plan=None):
@@ -22,7 +23,8 @@ def actions(dossier,plan=None):
             'runway':'Runway cannot be estimated from available evidence.'}
 
 
-def investigate(queries,api,store,planner=None,progress=None):
+def investigate(queries,api,store,planner=None,progress=None,identity_selections=None):
+    if not queries: raise ValueError('Enter at least one company')
     run=Run(companies=[Dossier(query=q) for q in queries]); store.save(run)
     canonical=set()
     for d in run.companies:
@@ -32,6 +34,8 @@ def investigate(queries,api,store,planner=None,progress=None):
             if progress: progress(d.query,name,detail)
         plan=None
         try:
+            if identity_selections and d.query in identity_selections:
+                d.metadata['identity_selection']=identity_selections[d.query]
             stage('PLAN','Resolve identity; require dated comparable counts and attributed sources. Permitted tools: identify, enrich, search, fetch.')
             d.status='running'
             stage('GATHER','Retrieve company, workforce, hiring, funding, leadership and news records.')
@@ -49,6 +53,7 @@ def investigate(queries,api,store,planner=None,progress=None):
             d.metadata['analysis_engine']='GEMINI' if plan else 'DETERMINISTIC FALLBACK'
             d.metadata['llm_model']=planner.model if plan else None
             d.metadata['llm_diagnostic']=planner.error if planner else 'No planner configured'
+            d.metadata['llm_diagnostics']=planner.diagnostics() if planner else {'provider':'NONE','status':'DETERMINISTIC FALLBACK'}
             focuses=[s.category for s in sorted(d.assessment.signals,key=lambda s:s.severity,reverse=True) if s.severity>0]
             focuses+=['leadership' if not any(e.category=='leadership_snapshot' for e in d.evidence) else 'business','business']
             if plan and plan.focus!='stop': focuses.insert(0,plan.focus)
@@ -65,15 +70,18 @@ def investigate(queries,api,store,planner=None,progress=None):
             stage('ASSESS',d.assessment.label+'; missing evidence is not safety.')
             d.status='partial' if d.errors else 'complete'
         except (ResearchError,ValueError,TypeError,KeyError) as exc:
+            if isinstance(exc,IdentityError): d.metadata['identity_candidates']=exc.options
             d.errors.append(str(exc)); d.status='partial' if d.evidence else 'failed'
             d.evidence=verify(d.evidence); d.assessment=assess(d.evidence)
         finally:
             d.advice=actions(d,plan)
             stage('DELIVER','Dossier and source ledger saved. Follow-up drafts are never sent.')
-    run.status='complete' if all(d.status in ('complete','duplicate') for d in run.companies) else 'partial'
+    run.status=('complete' if all(d.status in ('complete','duplicate') for d in run.companies) else
+                'failed' if not any(d.evidence for d in run.companies) else 'partial')
     run.usage=api.usage()
     run.usage['analysis_engine']='GEMINI + DETERMINISTIC CALCULATIONS' if any(d.metadata.get('analysis_engine')=='GEMINI' for d in run.companies) else 'DETERMINISTIC FALLBACK'
-    if planner: run.usage.update(llm_calls=planner.calls,llm_model=planner.model,llm_diagnostic=planner.error)
+    if planner: run.usage.update(llm_calls=planner.calls,llm_model=planner.model,llm_diagnostic=planner.error,llm_diagnostics=planner.diagnostics())
+    run.usage['incomplete_reasons']=[{'query':d.query,'status':d.status,'reasons':d.errors} for d in run.companies if d.status not in ('complete','duplicate')]
     if api.cache_hits: run.mode='CACHED REAL DATA' if not api.calls else 'LIVE DATA + CACHED REAL DATA'
     store.save(run)
     return run

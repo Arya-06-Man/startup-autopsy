@@ -13,6 +13,7 @@ from autopsy import reports
 from autopsy.risk import runway
 from autopsy.evidence import safe_url
 from autopsy.vcos_ui import render
+from autopsy.risk import metric_date
 
 st.set_page_config(page_title='Startup Autopsy VCOS',page_icon='◈',layout='wide')
 st.markdown('''<style>
@@ -53,6 +54,7 @@ with st.expander('Launch investigation',expanded=not bool(store.runs())):
         st.caption('Column: company, name, or domain. CSV and pasted entries are combined and deduplicated.')
         st.download_button('Download sample CSV','domain\nretool.com\nnotion.so\nlinear.app\n','sample_portfolio.csv','text/csv')
     launch=st.button('Launch autonomous investigation',type='primary',disabled=not settings.api_key)
+    settings.refresh_data=st.checkbox('Refresh provider data for this investigation',help='Bypass the response cache on launch. This retrieves provider data again; it does not guarantee a new underlying observation. Prior investigations remain unchanged.')
     if not settings.api_key: st.info('Add CRUSTDATA_API_KEY to .env to enable live investigations. Previous real runs remain available below.')
     if launch:
         try:
@@ -64,10 +66,13 @@ with st.expander('Launch investigation',expanded=not bool(store.runs())):
                     progress.progress(min(1.,(queries.index(company)+ (stages.index(stage)+1)/8)/len(queries)))
                     st.write(f'**{company} · {stage}** — {detail}')
                 api=Crustdata(settings,store); planner=Planner(settings)
-                try: run=investigate(queries,api,store,planner,update)
+                try: run=investigate(queries,api,store,planner,update,identity_selections=st.session_state.get('identity_selections'))
                 finally: api.close(); planner.close()
                 st.session_state['run_id']=run.id
+                st.session_state['requested_run_id']=run.id
                 status.update(label='Investigation saved · '+run.status,state='complete' if run.status=='complete' else 'error',expanded=False)
+            if run.status=='complete':
+                st.session_state['requested_section']='Evaluate'; st.rerun()
         except ValueError as exc: st.error(str(exc))
 
 if section=='Discover': st.stop()
@@ -82,8 +87,7 @@ if not runs:
     st.stop()
 
 ids=[r.id for r in runs]
-selected=st.selectbox('Investigation archive',ids,index=ids.index(st.session_state.get('run_id')) if st.session_state.get('run_id') in ids else 0,
-    format_func=lambda rid:next(r.created_at[:19].replace('T',' ')+' UTC · '+', '.join(d.name or d.query for d in r.companies)+' · '+r.status for r in runs if r.id==rid))
+selected=st.session_state.get('evidence_run_id',ids[0])
 run=next(r for r in runs if r.id==selected)
 if run.status=='running': st.warning('Interrupted investigation: completed stages are preserved. Launch a new run to continue research using cached responses.')
 st.caption(f'{run.mode}  ·  Investigation {run.id}  ·  {run.created_at}  ·  Execution: {run.status.upper()} · Engine: {run.usage.get("analysis_engine", "Legacy: inspect trace")}')
@@ -132,8 +136,8 @@ with dossier_tab:
     st.caption(f'{d.domain} · Crustdata ID {d.company_id or "unresolved"} · {d.assessment.label}')
     if d.metadata.get('description'): st.write(d.metadata['description'])
     for error in d.errors: st.warning(error)
-    workforce=[{'Date':e.event_date,'Employees':e.value} for e in d.evidence if e.category=='workforce' and e.status!='disputed/conflicting']
-    hiring=[{'Date':e.event_date,'Open roles':e.value} for e in d.evidence if e.category=='hiring' and e.status!='disputed/conflicting']
+    workforce=[{'Date':metric_date(e),'Employees':e.value} for e in d.evidence if e.category=='workforce' and e.status!='disputed/conflicting']
+    hiring=[{'Date':metric_date(e),'Open roles':e.value} for e in d.evidence if e.category=='hiring' and e.status!='disputed/conflicting']
     a,b=st.columns(2)
     for col,rows,field in [(a,workforce,'Employees'),(b,hiring,'Open roles')]:
         with col:
@@ -166,7 +170,7 @@ with timeline:
         page=st.number_input(f'Evidence page · {d.name or d.query} ({len(items)} observations)',min_value=1,max_value=total_pages,value=1,key='page_'+run.id+d.query)
         for e in items[(page-1)*25:page*25]:
             with st.expander(f'{e.event_date or e.publication_date or "Undated"} · {e.category} · {e.fact[:100]} · {e.id}'):
-                st.write(e.fact); st.caption(f'{e.status} · {e.provider} · Provider observation: {e.event_date or "unknown"} · Source publication: {e.publication_date or "unknown"} · Retrieved: {e.retrieved_at}')
+                st.write(e.fact); st.caption(f'{e.status} · {e.provider} · Observation: {e.observation_date or "unknown"} · Event: {e.event_date or "unknown"} · Publication: {e.publication_date or "unknown"} · Provider updated: {e.provider_updated_at or "unknown"} · Retrieved: {e.retrieved_at} · {e.data_mode}')
                 if safe_url(e.source): st.link_button('Open source / API reference',e.source)
                 else: st.code(e.source)
                 st.json(e.value,expanded=False); st.write(e.limitations)

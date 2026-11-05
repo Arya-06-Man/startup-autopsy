@@ -32,7 +32,7 @@ class Crustdata:
                     actual_credit_headers=self.actual_reported, audit=self.audit)
 
     def post(self, path, payload, estimate=1):
-        cached = self.store.cached(path, payload, self.settings.cache_hours)
+        cached = None if self.settings.refresh_data else self.store.cached(path, payload, self.settings.cache_hours)
         if cached:
             self.cache_hits += 1
             return {**cached, 'mode': 'CACHED REAL DATA'}
@@ -72,7 +72,7 @@ class Crustdata:
                     error=response.json().get('error',{})
                     if isinstance(error,dict) and error.get('type') == 'insufficient_credits':
                         self.stopped = True
-                except ValueError: pass
+                except (ValueError,AttributeError): pass
             if response.status_code in (429,500,502,503,504) and attempt < 2:
                 if self.transport is None:
                     try: delay = min(20, max(1, float(response.headers.get('Retry-After', 2 ** (attempt+1)))))
@@ -100,7 +100,7 @@ class Crustdata:
 
     def identify(self, query):
         field = 'domains' if '.' in query and ' ' not in query else 'names'
-        return self.post('/company/identify', {field:[query]}, estimate=0)
+        return self.post('/company/identify', {field:[query], 'exact_match':True, 'fields':['basic_info']}, estimate=0)
 
     def enrich(self, company_id, fields):
         # Conservative reservation per call; account pricing may vary by field grants.
@@ -115,8 +115,12 @@ def candidates(response):
         raise ResearchError('Unexpected company response: expected the documented top-level array.')
     result=[]
     for entry in response:
+        if not isinstance(entry,dict) or not isinstance(entry.get('matches',[]),list):
+            raise ResearchError('Malformed company identity response.')
         for match in entry.get('matches',[]):
+            if not isinstance(match,dict): raise ResearchError('Malformed company match.')
             company=match.get('company_data') or {}
+            if not isinstance(company,dict): raise ResearchError('Malformed company data.')
             if company.get('crustdata_company_id') is not None:
                 result.append(company)
     return result
@@ -125,10 +129,15 @@ def candidates(response):
 def resolve(response, query):
     matches=candidates(response)
     if '.' in query and ' ' not in query:
-        matches=[m for m in matches if (m.get('basic_info',{}).get('primary_domain') or '').lower().removeprefix('www.') == query]
+        def domains(company):
+            basic=company.get('basic_info') or {}
+            return [(d or '').lower().removeprefix('www.').rstrip('.') for d in [basic.get('primary_domain')]+(basic.get('all_domains') or []) if isinstance(d,str)]
+        matches=[m for m in matches if query.lower().removeprefix('www.').rstrip('.') in domains(m)]
     unique={str(m['crustdata_company_id']):m for m in matches}
     if not unique: raise ResearchError('No exact company match. Try its primary website domain.')
     if len(unique)>1:
         names=', '.join(m.get('basic_info',{}).get('name','Unknown') + ' (' + str(m.get('basic_info',{}).get('primary_domain','')) + ')' for m in unique.values())
         raise ResearchError('Ambiguous company identity. Enter a specific domain. Candidates: ' + names)
+    if not ('.' in query and ' ' not in query) and (next(iter(unique.values())).get('basic_info',{}).get('name') or '').casefold().strip()!=query.casefold().strip():
+        raise ResearchError('Company name is not an exact match; disambiguate explicitly.')
     return next(iter(unique.values()))

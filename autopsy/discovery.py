@@ -2,7 +2,7 @@
 from autopsy.api import ResearchError
 
 FIELDS=['crustdata_company_id','basic_info.name','basic_info.primary_domain','taxonomy.professional_network_industry',
-        'locations.country','headcount.total','headcount.growth_percent','funding.last_round_type','funding.total_investment_usd','hiring.openings_count']
+        'locations.country','headcount.total','headcount.growth_percent','funding.last_round_type','funding.total_investment_usd','hiring.openings_count','metadata.updated_at']
 
 
 def search_companies(api, industry='', country='', stage='', min_headcount=0, growth=None, cursor=None, limit=10):
@@ -43,7 +43,7 @@ def rows(page, mandate=None):
                        '6m growth %':(head.get('growth_percent') or {}).get('6m'),
                        'Funding stage':funding.get('last_round_type'),'Funding USD':funding.get('total_investment_usd'),
                        'Open roles':(c.get('hiring') or {}).get('openings_count'),
-                       'Retrieved':page['retrieved_at'],'Provider observation date':'Not supplied in search projection',
+                       'Retrieved':page['retrieved_at'],'Provider updated':(c.get('metadata') or {}).get('updated_at') or c.get('updated_at'),'Provider observation date':'Not supplied in search projection',
                        'Screening':'; '.join(fit) or 'Mandate review pending','Unresolved':'; '.join(gaps),
                        'Source':'SINGLE-SOURCE OBSERVATIONS · '+page['mode']})
     return result

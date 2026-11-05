@@ -6,25 +6,28 @@ from autopsy.evidence import number, valid_date
 WEIGHTS={'workforce':.35,'leadership':.30,'hiring':.20,'business':.15}
 
 
+def metric_date(e): return e.observation_date or e.event_date
+
+
 def trend(evidence, category, as_of=None):
     today=as_of or date.today()
-    rows=sorted([e for e in evidence if e.category==category and e.event_date and valid_date(e.event_date)
+    rows=sorted([e for e in evidence if e.category==category and metric_date(e) and valid_date(metric_date(e))
                  and e.status in ('single-source observation','corroborated observation') and number(e.value)
-                 and date.fromisoformat(e.event_date)<=today], key=lambda e:e.event_date)
+                 and date.fromisoformat(metric_date(e))<=today], key=metric_date)
     if len(rows)<2: return None
     latest=rows[-1]
-    if (today-date.fromisoformat(latest.event_date)).days > 120: return None
+    if (today-date.fromisoformat(metric_date(latest))).days > 120: return None
     # Closest available baseline to 90 days before latest, within a 60–120 day window.
-    target=date.fromisoformat(latest.event_date)-timedelta(days=90)
-    baselines=[e for e in rows[:-1] if 60 <= (date.fromisoformat(latest.event_date)-date.fromisoformat(e.event_date)).days <=120 and e.value>0]
+    target=date.fromisoformat(metric_date(latest))-timedelta(days=90)
+    baselines=[e for e in rows[:-1] if 60 <= (date.fromisoformat(metric_date(latest))-date.fromisoformat(metric_date(e))).days <=120 and e.value>0]
     if not baselines: return None
-    prior=min(baselines,key=lambda e:abs((date.fromisoformat(e.event_date)-target).days))
+    prior=min(baselines,key=lambda e:abs((date.fromisoformat(metric_date(e))-target).days))
     change=(latest.value-prior.value)/prior.value*100
     # -30% workforce or -50% hiring saturates category priority.
     scale=30 if category=='workforce' else 50
     severity=min(100,max(0,-change/scale*100))
     return Signal(category=category,change_pct=round(change,2),severity=round(severity,1),evidence_ids=[prior.id,latest.id],
-        explanation=f'{prior.value:g} → {latest.value:g} between {prior.event_date} and {latest.event_date}: {change:+.1f}%. Provider-defined comparable count series.',
+        explanation=f'{prior.value:g} → {latest.value:g} between {metric_date(prior)} and {metric_date(latest)}: {change:+.1f}%. Provider-defined comparable count series.',
         alternatives=['Planned efficiency or role mix changes','Coverage changes or delayed profile updates'] if category=='workforce' else ['Roles filled or seasonal recruiting','Shift to contractors or a different job board'])
 
 

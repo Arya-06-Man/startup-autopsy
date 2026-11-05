@@ -17,6 +17,9 @@ class Evidence(BaseModel):
     provider: str = 'Crustdata'
     source: str
     event_date: str | None = None
+    observation_date: str | None = None
+    provider_updated_at: str | None = None
+    data_mode: str = 'Unknown / legacy record'
     publication_date: str | None = None
     retrieved_at: str = Field(default_factory=now)
     status: Literal['single-source observation', 'corroborated observation', 'hypothesis', 'disputed/conflicting', 'unknown'] = 'single-source observation'

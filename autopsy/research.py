@@ -4,6 +4,7 @@ from urllib.parse import urlsplit
 from autopsy.api import resolve, ResearchError
 from autopsy.evidence import normalize_company, normalize_search, safe_url
 from autopsy.models import Evidence
+from autopsy.identity import identify_company
 
 class TextParser(HTMLParser):
     def __init__(self): super().__init__(); self.parts=[]; self.hidden=0
@@ -16,18 +17,21 @@ class TextParser(HTMLParser):
 
 
 def gather(api,dossier):
-    result=api.identify(dossier.query)
-    company=resolve(result['data'],dossier.query)
+    company,result,method=identify_company(api,dossier.query,dossier.metadata.get('identity_selection'))
     dossier.company_id=str(company['crustdata_company_id'])
-    dossier.metadata=company.get('basic_info') or {}
+    dossier.metadata=dict(company.get('basic_info') or {})
+    dossier.metadata['identity_resolution']={'method':method,'requested':dossier.query,'retrieved_at':result['retrieved_at'],'mode':result['mode']}
     dossier.name=dossier.metadata.get('name',dossier.query)
     dossier.domain=dossier.metadata.get('primary_domain','')
     dossier.evidence.extend(normalize_company(company,result))
-    result=api.enrich(dossier.company_id,['basic_info','headcount.total','headcount.timeseries','hiring.openings_count','hiring.open_jobs_timeseries','funding','people.founders','people.cxos','news'])
-    enriched=resolve(result['data'],dossier.name)
-    if str(enriched['crustdata_company_id'])!=dossier.company_id:
+    result=api.enrich(dossier.company_id,['basic_info','headcount.total','headcount.timeseries','hiring.openings_count','hiring.open_jobs_timeseries','funding','people.founders','people.cxos','news','updated_at'])
+    from autopsy.api import candidates
+    enriched_rows=[c for c in candidates(result['data']) if str(c['crustdata_company_id'])==dossier.company_id]
+    if len(enriched_rows)!=1:
         raise ResearchError('Enrichment identity conflicts with resolved company ID.')
+    enriched=enriched_rows[0]
     dossier.metadata.update(enriched.get('basic_info') or {})
+    dossier.metadata['provider_updated_at']=(enriched.get('metadata') or {}).get('updated_at') or enriched.get('updated_at')
     dossier.evidence.extend(normalize_company(enriched,result))
 
 
@@ -61,6 +65,6 @@ def fetch_lead(api,dossier,leads):
             dossier.evidence.append(Evidence(company_id=dossier.company_id,category='fetch_error',fact='Source could not be read reliably',value={'title':row.get('title'),'text':text[:1500]},source=row['url'],retrieved_at=result['retrieved_at'],status='unknown',limitations='Provider fetch succeeded but returned an empty, blocked or unavailable page. No event claim extracted.'))
             continue
         dossier.evidence.append(Evidence(company_id=dossier.company_id,category='article',fact=str(row.get('title') or 'Fetched source document'),
-            value={'text':text},source=row['url'],retrieved_at=result['retrieved_at'],status='single-source observation',
+            value={'text':text},source=row['url'],retrieved_at=result['retrieved_at'],data_mode=result.get('mode','Unknown'),status='single-source observation',
             limitations='Fetched source text. Company attribution, event date and claims require review; not independent corroboration of Crustdata metrics.'))
     if set(urls)-successful: dossier.errors.append('Some source pages could not be fetched; search leads retained for manual review.')
