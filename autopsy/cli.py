@@ -17,10 +17,30 @@ def main():
     parser.add_argument('--check-llm',action='store_true',help='Make a real structured Gemini request and print credential-safe diagnostics')
     parser.add_argument('--check-discovery',metavar='COUNTRY',help='Search two indexed companies in a country; bypass cache')
     parser.add_argument('--list-llm-models',action='store_true',help='List advertised Gemini text Flash models without generating content')
+    parser.add_argument('--diagnose-llm',action='store_true',help='Bounded discovery, plain text and minimal structured generation probes')
+    parser.add_argument('--model',default='',help='Explicit Gemini model for diagnostics/checks; does not modify .env')
+    parser.add_argument('--check-committee',action='store_true',help='Run three real role passes with explicitly synthetic diagnostic assumptions')
     parser.add_argument('--output',default='data/reports')
     args=parser.parse_args()
     settings=Settings.load(); store=Store(); api=Crustdata(settings,store); planner=Planner(settings)
+    if args.model: settings.gemini_model=args.model
     try:
+        if args.check_committee:
+            from autopsy.committee import context,review
+            from autopsy.mandate import Mandate
+            from autopsy.finance import Deal
+            fixture=Deal(company_id='synthetic-diagnostic',name='SYNTHETIC DIAGNOSTIC ONLY',investment=0,valuation=1,provenance='SYNTHETIC DEMO DATA')
+            result=review(context(Mandate(capital=100),[fixture],{}),planner)
+            print({'input_mode':'SYNTHETIC DIAGNOSTIC ASSUMPTIONS; no real company data','engine':result['engine'],
+                   'roles':[{'role':p['role'],'engine':p['engine']} for p in result['perspectives']],
+                   'diagnostics':result['provider_diagnostics']})
+            return 0 if result['engine']=='GEMINI' else 1
+        if args.diagnose_llm:
+            import json
+            from autopsy.diagnostics import gemini_probe
+            result=gemini_probe(settings,args.model)
+            print(json.dumps(result,indent=2))
+            return 0 if result.get('structured_generation_verified') else 1
         if args.list_llm_models:
             if not settings.gemini_key:
                 print('No GEMINI_API_KEY configured'); return 1

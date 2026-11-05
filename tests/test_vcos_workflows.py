@@ -62,7 +62,7 @@ def test_structured_role_passes_validate_refs(bad_ref):
     planner=Planner(Settings(gemini_key='test'),httpx.MockTransport(respond)); planner.model='models/synthetic-flash'
     result=review(ctx,planner)
     assert result['engine']==('DETERMINISTIC FALLBACK' if bad_ref else 'GEMINI')
-    assert planner.calls==3
+    assert planner.calls==(1 if bad_ref else 3)  # Validation failure opens the circuit.
     planner.close()
 
 
