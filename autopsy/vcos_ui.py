@@ -271,6 +271,9 @@ def mandate_builder(workspace,mandate,saved):
     if submit:
         try:
             value=Mandate.model_validate_json(raw)
+            # Keep earlier reviewed mandates loadable instead of overwriting them.
+            from uuid import uuid4
+            value=value.model_copy(update={'id':uuid4().hex})
             workspace.save('mandates',value.model_dump(mode='json'))
             st.session_state.mandate=value.model_dump(mode='json')
             st.success(f'Saved {value.name}: {value.currency} {value.deployable:,.0f} deployable; {value.reserve:,.0f} reserved. All hard limits enforced.')
