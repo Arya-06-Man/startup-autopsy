@@ -67,7 +67,7 @@ def reports_page(store,workspace):
         ui.empty('Your report library starts here.','Investigate companies for a research briefing, or compare opportunities for a committee memo.','Search Companies','Company Search')
         if st.button('Go to Investment Committee'): ui.go('Investment Committee')
         return
-    st.dataframe(pd.DataFrame([{'Type':r['type'],'Companies covered':r['companies'],'Created':r['date'][:19],
+    st.dataframe(pd.DataFrame([{'Type':r['type'],'Companies covered':r['companies'],'Record created':r['date'][:19],
         'Status':r['status'],'Source mode':r['mode']} for r in options]),hide_index=True,width='stretch')
     ids=[r['id'] for r in options]
     requested=st.session_state.pop('requested_report_id',None)
@@ -77,7 +77,8 @@ def reports_page(store,workspace):
     item=next(r for r in options if r['id']==selected)
     with st.container(border=True):
         st.subheader(item['title'])
-        ui.source_tags(item['mode'],item['date'])
+        ui.source_tags(item['mode'],item['date'],timestamp_label='Investigation started' if 'run' in item else 'Report saved')
+        st.caption('Downloads are prepared on demand. The PDF records its creation time; original provider retrieval dates remain in the source register.')
         st.caption(item['type']+' · '+item['status'])
         try:
             with st.spinner('Preparing validated report formats'):

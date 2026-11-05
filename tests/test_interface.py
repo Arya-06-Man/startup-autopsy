@@ -97,6 +97,8 @@ def test_committee_report_library_all_exports(tmp_path,monkeypatch):
     assert {b.label for b in at.get('download_button')}=={'Download PDF','Print Report','Download HTML','Download Markdown','Export JSON'}
     saved=Workspace().list('reports')
     assert len(saved)==1 and len(saved[0]['context']['deals'])==2
+    assert any('Report saved '+saved[0]['created_at'] in m.value for m in at.markdown)
+    assert not any('Retrieved '+saved[0]['created_at'] in m.value for m in at.markdown)
     button(at,'Open Report').click().run()
     assert not at.exception
     at.radio[0].set_value('Overview').run()

@@ -63,8 +63,8 @@ def empty(title,description,action=None,target=None,key=None):
         if action and st.button(action,key=key,type='primary'): go(target)
 
 
-def source_tags(mode,retrieved=None,observed=None):
-    values=[mode or 'Source mode unknown','Retrieved '+str(retrieved or 'unknown')]
+def source_tags(mode,retrieved=None,observed=None,timestamp_label='Retrieved'):
+    values=[mode or 'Source mode unknown',timestamp_label+' '+str(retrieved or 'unknown')]
     if observed: values.append('Observed '+str(observed))
     st.markdown(''.join('<span class="source-tag">'+escape(str(v))+'</span>' for v in values),unsafe_allow_html=True)
 

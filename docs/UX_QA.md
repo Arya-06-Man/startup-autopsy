@@ -16,6 +16,7 @@ The principal UX defects were routing and presentation: the entry screen mixed s
 - Portfolio budget/reserve/limit summaries, allocation explanations, alternative strategies and original exposure/stress charts.
 - Left-side Operations/Financing/Returns controls and right-side live War Room outcomes. Original deterministic mathematics and snapshot/replay remain unchanged.
 - Guided committee prerequisites, visibly labeled model/fallback status, preserved three-role review, validated saved reports and five report controls.
+- Report record dates are labeled Report saved or Investigation started, never provider retrieval dates; PDF creation time and original source dates are distinct.
 - Native A4 PDF from the same validated context as HTML/Markdown/JSON, embedded fonts, headers/footers/page numbers, source links, wrapping/repeated table headers and vector cash chart. Print downloads the actual PDF for normal viewer printing.
 
 ## Verification executed
