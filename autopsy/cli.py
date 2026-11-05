@@ -16,10 +16,23 @@ def main():
     parser.add_argument('--check',metavar='DOMAIN',help='Make one authenticated Identify request and print normalized identity only')
     parser.add_argument('--check-llm',action='store_true',help='Make a real structured Gemini request and print credential-safe diagnostics')
     parser.add_argument('--check-discovery',metavar='COUNTRY',help='Search two indexed companies in a country; bypass cache')
+    parser.add_argument('--list-llm-models',action='store_true',help='List advertised Gemini text Flash models without generating content')
     parser.add_argument('--output',default='data/reports')
     args=parser.parse_args()
     settings=Settings.load(); store=Store(); api=Crustdata(settings,store); planner=Planner(settings)
     try:
+        if args.list_llm_models:
+            if not settings.gemini_key:
+                print('No GEMINI_API_KEY configured'); return 1
+            import httpx
+            try:
+                response=planner.http.get('models')
+                if response.is_error:
+                    print({'model_discovery_status':response.status_code}); return 1
+                print([m['name'] for m in response.json().get('models',[]) if 'generateContent' in m.get('supportedGenerationMethods',[]) and 'flash' in m['name'] and not any(x in m['name'] for x in ('image','tts'))])
+                return 0
+            except (httpx.HTTPError,ValueError,KeyError):
+                print('Model discovery failed; no generation attempted'); return 1
         if args.check_llm:
             from autopsy.models import Dossier
             result=planner.plan(Dossier(query='Integration diagnostic',name='Integration diagnostic'))

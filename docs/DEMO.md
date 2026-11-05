@@ -1,4 +1,32 @@
-# Five-minute demo
+# Two-minute VCOS demo
+
+This is a recording script, not a claim that a video was recorded. Browser connection was unavailable during implementation.
+
+## 0:00–0:20 — Investor mandate
+
+“I have capital, constraints and competing deals. Startup Autopsy turns company intelligence into auditable investment work.” In Overview enter the ₹10 crore Indian B2B SaaS example, draft constraints, review the guided/advanced fields, and save. Show the explicit follow-on reserve and deployable capital.
+
+## 0:20–0:40 — Discover and investigate
+
+In Discover, search with `IND` plus an exact documented industry if needed. Explain why the companies match and why index observations are not investment recommendations. Select two domains and launch bounded diligence, or reopen a previously completed real investigation with its original retrieval date. Do not imply cached data is a new live call.
+
+## 0:40–1:00 — Compare and question
+
+In Evaluate select two investigated companies and enter **actual supplied** terms and dated financials with the guided editor. If no real financials are available, leave them missing and show “MORE DILIGENCE REQUIRED.” Never invent real-company valuations for presentation. Show ownership, valuation/revenue where supplied, source coverage and missing documents side by side.
+
+## 1:00–1:20 — War Room and allocation
+
+Use explicitly described user assumptions for cash, burn, funding timing and exit values. Run the scenario comparison, show delayed financing/capital loss and assumptions. In Portfolio Lab compute conditional allocations and alternatives. A zero-investment result is a valid decision; show which hard constraint or missing fact prevents deployment.
+
+## 1:20–1:45 — Challenge and replay
+
+Run committee challenge. State which engine actually responded; current live Gemini generation has not been validated, so show deterministic fallback honestly if it persists. Three AI role passes are one provider, not independent experts. Save a decision, change a supplied assumption, recompute and compare actual snapshot differences.
+
+## 1:45–2:00 — Deliver the service
+
+Download the HTML committee memo and JSON audit record. Open Evidence & Reports to show a finding's original evidence IDs and separate source dates. “No transaction, fabricated financial or founder outreach. The output is a reviewed work product with explicit approval conditions.” State the executed test count from README.
+
+## Longer investigation walkthrough
 
 ## Before presenting
 

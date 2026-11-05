@@ -11,16 +11,23 @@
 - [x] Investor actions, founder questions and draft-only outreach
 - [x] HTML, Markdown and JSON deliverables
 - [x] Local persistence, caching, budgets, retries and partial failure handling
-- [x] 45 executed passing tests; synthetic test fixtures isolated from live output
+- [x] 89 executed passing tests; synthetic test fixtures isolated from live output
 - [x] Empty, populated and actual cached real dashboard AppTest checks
 - [x] Connected Crustdata live requests and actual-response normalization/report validation
 - [x] README, environment example, sample CSV, architecture and demo script
+- [x] Reviewed investor mandates, guided forms, local persistence and conservative thesis parser
+- [x] Live versioned Company Search, stable cursor paging, shortlist and named watchlists
+- [x] Deal comparison, supplied financial ratios and deterministic readiness gates
+- [x] Scenario-based mixed-integer allocation with no-investment, reserve and concentration constraints
+- [x] War Room cash/exit scenarios, funding-delay sensitivity, ordinary-equity follow-on calculator
+- [x] Structured committee roles with citation validation and honest deterministic fallback
+- [x] HTML/Markdown/JSON committee memos, frozen-evidence snapshots and actual structural replay
 - [x] Tested milestone commits pushed to existing GitHub repository
 
 ## Must finish before claiming complete live validation
 
-- [ ] Add CRUSTDATA_API_KEY locally and execute a direct Python Identify check
-- [ ] Execute a complete direct Python HTTP investigation and inspect outputs
+- [x] Execute uncached direct Python Identify and two-result Company Search checks
+- [x] Execute a complete direct Python HTTP investigation and save reports
 - [ ] Verify Gemini against an accessible live model if used in the presentation
 - [ ] Visual browser review at presentation resolution (browser unavailable during build)
 - [ ] Record and rehearse the actual demo
@@ -38,3 +45,5 @@
 ## Known limitations to disclose
 
 No bankruptcy prediction. Numeric leadership/adverse-business scoring and automatic semantic article contradiction detection are not implemented. No independent corroboration is automatically asserted. Cash and burn are never inferred. Credit ceilings are estimates, not guaranteed billing caps. Runtime rate limits are per client, not shared across sessions. Interrupted runs reopen preserved work but do not automatically resume in the background. Product is for local use without production authentication or tenant isolation.
+
+Advanced legal instrument conversion and preference waterfalls, multi-round cap tables, uploaded-document extraction and existing-holding outcome stress are outside this build. Financial and document inputs are user attestations. Live Gemini generation encountered provider errors/timeouts; no successful structured response is claimed. No connected browser was available for visual QA or video capture. Deterministic fallback is functional and covered by executed UI tests. See README for model conventions and current validation results.

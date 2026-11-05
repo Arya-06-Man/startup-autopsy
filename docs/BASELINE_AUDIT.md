@@ -16,7 +16,7 @@ The default 20 attempts, 30 estimated credits and two research iterations are sh
 
 Cache hits preserve original retrieval timestamps. Expired, malformed, timezone-naive and future-dated cache records are now misses. This prevents future timestamps from keeping data eligible indefinitely. Histories are retained; old runs are never rewritten by these changes.
 
-Gemini selection previously trusted discovery order. Automatic selection now prioritizes newer advertised text Flash models and tries at most three candidates after 404/503. Explicit model configuration is honored. Diagnostics expose safe status categories and model names without URLs, request headers or keys.
+Gemini selection previously trusted discovery order. Automatic selection now prioritizes an advertised stable Flash alias, then newer non-preview text models, and tries at most three candidates after 404/503. Explicit model configuration is honored. Diagnostics expose safe status categories and model names without URLs, request headers or keys. The final stable-alias generation check timed out; no successful live generation is claimed.
 
 ## Contract sources
 

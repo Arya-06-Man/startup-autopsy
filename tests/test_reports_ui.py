@@ -25,7 +25,8 @@ def test_empty_dashboard(tmp_path,monkeypatch):
     app=Path(__file__).resolve().parents[1]/'app.py'
     at=AppTest.from_file(str(app)).run(timeout=20)
     assert not at.exception
-    assert 'Your portfolio.' in at.title[0].value
+    assert 'Startup Autopsy VCOS' in at.title[0].value
+    assert 'Investment overview' in [s.value for s in at.subheader]
 
 
 def test_populated_dashboard(tmp_path,monkeypatch):
@@ -41,6 +42,7 @@ def test_populated_dashboard(tmp_path,monkeypatch):
     Store(tmp_path/'data').save(Run(companies=[d],mode='SYNTHETIC TEST FIXTURES',status='complete'))
     monkeypatch.chdir(tmp_path)
     at=AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py')).run(timeout=30)
+    at.radio[0].set_value('Evidence & Reports').run()
     assert not at.exception
     assert len(at.tabs)==6
     assert at.metric[1].value=='1'

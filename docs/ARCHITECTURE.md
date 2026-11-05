@@ -1,5 +1,54 @@
 # Architecture
 
+## VCOS decision layer
+
+The original investigator below remains the single bounded research orchestrator. New deterministic modules consume dossiers; they never ask the LLM to calculate financial outputs or mutate external evidence.
+
+```mermaid
+flowchart LR
+    M[Reviewed investor mandate] --> D[Versioned indexed Company Search]
+    D --> S[Watchlist / 2–5 company shortlist]
+    S --> I[Existing bounded investigation]
+    I --> E[(Dated evidence dossiers)]
+    U[User-supplied terms and dated financials] --> C[Deal comparison / readiness gates]
+    M --> C
+    E --> C
+    C --> P[Constrained mixed-integer allocation]
+    U --> W[Deterministic War Room / ordinary equity]
+    W --> K[Committee: 3 bounded structured role passes]
+    P --> K
+    E --> K
+    K --> R[HTML / Markdown / JSON investment memo]
+    K --> Q[(Immutable decision snapshots)]
+    Q --> X[Actual before/after structural replay]
+```
+
+| Module | Responsibility and trust boundary |
+|---|---|
+| `mandate.py` | Finite validated inputs, cross-field capital constraints, conservative thesis extraction, atomic local mandate/watchlist/snapshot persistence. No automatic hard-constraint relaxation. |
+| `discovery.py` | Documented filter-only company search, fixed stable sort, cursor pagination, up to 20 results/call, no automatic enrichment. Returnable taxonomy differs from the industry filter alias. |
+| `finance.py` | Supplied financial ratios, ordinary-equity entry terms, readiness, monthly cash simulation and a single round/pool/pro-rata calculation. Unsupported instruments withhold equity math. |
+| `portfolio.py` | SciPy mixed-integer optimization, normalized capital variables and binary active cheques. Enforces minimum/maximum cheque, company/sector/stage exposure, reserves and liquidity; aggregates existing duplicate exposures. Includes cash as the zero-deployment alternative. Five-candidate and five-second solver limits. |
+| `committee.py` | Three roles using one Gemini provider, validated evidence/assumption IDs, deterministic fallback, fixed readiness summary and structural snapshot diff. AI perspectives are hypotheses, not independent verification. |
+| `vcos_reports.py` | Readable escaped HTML decision memo plus Markdown/JSON with source records, supplied inputs, financial calculations, scenario assumptions and explicit limitations. Validates committee references again. |
+| `vcos_ui.py` | Seven-section Streamlit workspace, guided inputs plus full editable schemas, persistent mandate/deal context, stale allocation/committee invalidation, frozen-evidence replay. No expensive API call runs without an explicit action. |
+
+All private artifacts stay below ignored `data/`. Currency conversion, liquidation preferences, SAFE/note conversion and return probabilities are not inferred. Empty financials remain `None`. Readiness does not imply financial health, absence of fraud or investment approval. Human document verification is explicitly a user attestation.
+
+### Scenario conventions
+
+Monthly burn means current **net burn**, so supplied revenue is not subtracted twice. Modeled revenue changes adjust that baseline and pass fully through to cash flow. Implementation cost occurs at month zero, burn reduction from month one, financing at the start of its specified month if the company has survived. Exhaustion at month end is absorbing; no rescue after exhaustion is assumed. Exit proceeds are zero in this capital-loss convention. Otherwise proceeds = modeled ending ownership × supplied exit value; MOIC divides by user cost basis and annualized return is `MOIC ** (1 / years) - 1`.
+
+Portfolio optimization uses supplied MOIC scenarios, never historical startup return series or invented correlations. Cash surplus is zero in nominal terms. Moderate defaults to maximizing minimum surplus across downside/base/upside; Conservative chooses downside; Aggressive chooses base. There are no scenario probabilities. Existing holdings affect exposure and available capital, but current outcome stress testing covers new allocations only.
+
+### Execution and freshness
+
+Provider failures still mark research execution partial/failed. Optional Gemini failure is recorded in diagnostics and does not convert successful evidence collection to partial. Coverage remains the existing observed-category measurement. No numeric decision-confidence score is fabricated. Model selection prefers an advertised stable alias and tries at most three compatible candidates after 404/503; configured model overrides remain explicit. Reports and UI label the engine actually used.
+
+Cache reads reject future, malformed, timezone-naive and expired records and retain original retrieval dates on hits. Provider observation, publication and retrieval dates remain separate. Saved decisions contain original dossiers; reopening a snapshot visibly switches to frozen evidence until the user chooses current evidence. Allocation hashes cover mandate, terms and evidence; committee hashes additionally include allocation and War Room outcomes. Changed inputs cannot silently reuse an old recommendation.
+
+## Preserved investigation architecture
+
 One bounded investigator coordinates specialized Python research functions. The LLM is an optional planner; deterministic code owns budgets, API execution, verification, scoring and persistence.
 
 ```mermaid

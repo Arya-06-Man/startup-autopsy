@@ -105,7 +105,9 @@ class Workspace:
         if kind not in ('mandates','snapshots','watchlists'): raise ValueError('Invalid record kind')
         result = []
         for path in (self.root / kind).glob('*.json'):
-            try: result.append(json.loads(path.read_text()))
+            try:
+                record=json.loads(path.read_text())
+                if isinstance(record,dict): result.append(record)
             except (ValueError, OSError): continue
         return sorted(result, key=lambda r:r.get('created_at',''), reverse=True)
 

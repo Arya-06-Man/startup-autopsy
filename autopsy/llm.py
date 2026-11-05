@@ -38,8 +38,10 @@ class Planner:
                 requested=self.settings.gemini_model.removeprefix('models/')
                 eligible=[m for m in models if (m=='models/'+requested if requested else 'flash' in m and 'image' not in m and 'tts' not in m)]
                 if not eligible: raise ValueError('No compatible configured Gemini model supports generateContent.')
-                # Discovery order is not a compatibility guarantee. Prefer newer text Flash models.
-                eligible.sort(key=lambda name: tuple(int(x) for x in re.findall(r'\d+', name)), reverse=True)
+                # Prefer the advertised stable alias, then numbered non-preview text models.
+                eligible.sort(key=lambda name: (name=='models/gemini-flash-latest',
+                    not any(x in name for x in ('preview','omni','lite')),
+                    tuple(int(x) for x in re.findall(r'\d+', name))), reverse=True)
                 self.model=eligible[0]
                 self.alternatives=eligible[1:3] if not requested else []
             items=[{'id':e.id,'category':e.category,'fact':e.fact,'date':e.event_date,'status':e.status,'value':str(e.value)[:1200]} for e in dossier.evidence[-60:]]

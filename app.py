@@ -12,15 +12,16 @@ from autopsy.orchestrator import investigate
 from autopsy import reports
 from autopsy.risk import runway
 from autopsy.evidence import safe_url
+from autopsy.vcos_ui import render
 
-st.set_page_config(page_title='Startup Autopsy | Portfolio Intelligence',page_icon='◈',layout='wide')
+st.set_page_config(page_title='Startup Autopsy VCOS',page_icon='◈',layout='wide')
 st.markdown('''<style>
 .block-container{padding-top:2.5rem;max-width:1500px}h1{font-weight:650!important;letter-spacing:-.045em}h2{letter-spacing:-.025em}div[data-testid="stMetric"]{background:#121c2a;border:1px solid #263448;border-radius:12px;padding:20px}div[data-testid="stMetricLabel"]{color:#93a5bd}.eyebrow{font-size:.75rem;letter-spacing:.2em;color:#58dac2;font-weight:650}.intro{color:#93a5bd;max-width:780px;font-size:1.05rem}.stTabs [data-baseweb="tab-list"]{gap:24px}a{color:#58dac2}section[data-testid="stSidebar"]{border-right:1px solid #263448}div[data-testid="stExpander"]{border-color:#263448}
 </style>''',unsafe_allow_html=True)
 settings=Settings.load(); store=Store()
 with st.sidebar:
     st.markdown('### ◈ STARTUP AUTOPSY')
-    st.caption('PORTFOLIO INTELLIGENCE / 01')
+    st.caption('VENTURE CAPITAL OPERATING SYSTEM')
     st.divider()
     st.markdown('**Detect → Investigate → Verify**  \nAssess → Recommend → Report')
     st.caption('Autonomous analyst service for investor follow-up.')
@@ -36,13 +37,17 @@ with st.sidebar:
         st.caption('Enrichment reserves 5 estimated credits per call. Actual plan prices may vary; this is an estimate ceiling, not a guaranteed billing cap. Retries consume the attempt budget.')
     st.caption('ContextCon 04 · IIT Kanpur  \nInvesting / Services, Replaced')
 
-st.markdown('<div class="eyebrow">AUTONOMOUS VC PORTFOLIO INTELLIGENCE & INTERVENTION AGENT</div>',unsafe_allow_html=True)
-st.title('Your portfolio. Under investigation.')
-st.markdown('<p class="intro">Turn fragmented company signals into sourced investigations, explicit uncertainties, and a finished investor follow-up plan.</p>',unsafe_allow_html=True)
+st.markdown('<div class="eyebrow">AUTONOMOUS VENTURE CAPITAL INTELLIGENCE & DECISION PLATFORM</div>',unsafe_allow_html=True)
+st.title('Startup Autopsy VCOS')
+section=render(settings,store)
+if section not in ('Discover','Evidence & Reports'): st.stop()
+if section=='Discover':
+    if st.session_state.get('shortlist_text'):
+        st.session_state['investigation_queries']=st.session_state.pop('shortlist_text')
 with st.expander('Launch investigation',expanded=not bool(store.runs())):
     left,right=st.columns([3,2])
     with left:
-        text=st.text_area('Company names or domains',placeholder='retool.com\nnotion.so\nlinear.app',height=130,help='One company per line. Up to five unique companies. Domains resolve more precisely.')
+        text=st.text_area('Company names or domains',placeholder='retool.com\nnotion.so\nlinear.app',height=130,key='investigation_queries',help='One company per line. Up to five unique companies. Domains resolve more precisely.')
     with right:
         upload=st.file_uploader('Or upload portfolio CSV',type=['csv'])
         st.caption('Column: company, name, or domain. CSV and pasted entries are combined and deduplicated.')
@@ -65,6 +70,7 @@ with st.expander('Launch investigation',expanded=not bool(store.runs())):
                 status.update(label='Investigation saved · '+run.status,state='complete' if run.status=='complete' else 'error',expanded=False)
         except ValueError as exc: st.error(str(exc))
 
+if section=='Discover': st.stop()
 runs=store.runs()
 if not runs:
     st.divider()
@@ -80,7 +86,7 @@ selected=st.selectbox('Investigation archive',ids,index=ids.index(st.session_sta
     format_func=lambda rid:next(r.created_at[:19].replace('T',' ')+' UTC · '+', '.join(d.name or d.query for d in r.companies)+' · '+r.status for r in runs if r.id==rid))
 run=next(r for r in runs if r.id==selected)
 if run.status=='running': st.warning('Interrupted investigation: completed stages are preserved. Launch a new run to continue research using cached responses.')
-st.caption(f'{run.mode}  ·  Investigation {run.id}  ·  {run.created_at}  ·  {run.status.upper()}')
+st.caption(f'{run.mode}  ·  Investigation {run.id}  ·  {run.created_at}  ·  Execution: {run.status.upper()} · Engine: {run.usage.get("analysis_engine", "Legacy: inspect trace")}')
 companies=[d for d in run.companies if d.status!='duplicate']
 metrics=st.columns(4)
 metrics[0].metric('Companies resolved',sum(bool(d.company_id) for d in companies))
@@ -160,7 +166,7 @@ with timeline:
         page=st.number_input(f'Evidence page · {d.name or d.query} ({len(items)} observations)',min_value=1,max_value=total_pages,value=1,key='page_'+run.id+d.query)
         for e in items[(page-1)*25:page*25]:
             with st.expander(f'{e.event_date or e.publication_date or "Undated"} · {e.category} · {e.fact[:100]} · {e.id}'):
-                st.write(e.fact); st.caption(f'{e.status} · {e.provider} · Retrieved {e.retrieved_at}')
+                st.write(e.fact); st.caption(f'{e.status} · {e.provider} · Provider observation: {e.event_date or "unknown"} · Source publication: {e.publication_date or "unknown"} · Retrieved: {e.retrieved_at}')
                 if safe_url(e.source): st.link_button('Open source / API reference',e.source)
                 else: st.code(e.source)
                 st.json(e.value,expanded=False); st.write(e.limitations)
