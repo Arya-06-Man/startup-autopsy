@@ -36,7 +36,11 @@ def render(settings,store):
     ui.styles()
     st.sidebar.markdown('### ◈ Startup Autopsy')
     st.sidebar.caption('VENTURE CAPITAL INTELLIGENCE')
-    section=st.sidebar.radio('Workspace',NAV,key='vcos_section',format_func=lambda page:ui.LABELS[page])
+    for label,target in [('Overview','Overview'),('Discover & Investigate','Discover'),('Compare & Forecast','Evaluate'),('Portfolio Decision','Portfolio Lab'),('Reports','Reports')]:
+        if st.sidebar.button(label,key='primary_nav_'+target,width='stretch',type='primary' if st.session_state.get('vcos_section','Overview')==target else 'secondary'): ui.go(target)
+    st.sidebar.caption('Current page: '+ui.TITLES.get(st.session_state.get('vcos_section','Overview'),'Overview'))
+    with st.sidebar.expander('More tools & saved work'):
+        section=st.radio('Workspace',NAV,key='vcos_section',format_func=lambda page:ui.LABELS[page])
     saved=workspace.mandates()
     active=next((r for r in workspace.list('comparisons') if r.get('id')=='active'),None)
     if active:
@@ -182,8 +186,8 @@ def render(settings,store):
         from autopsy.company_intelligence import compare as compare_intelligence
         intel_dossiers=[dossiers.get(cid) for cid in selected]
         intel_dossiers=[d for d in intel_dossiers if d]
-        st.subheader('COMPANY INTELLIGENCE & OPERATING MOMENTUM')
-        st.caption('Company Intelligence Comparison · Selected canonical company IDs: '+', '.join(selected))
+        st.subheader('Investment Intelligence Comparison')
+        st.caption('Saved company evidence · Operating signals are separate from supplied investment assumptions.')
         if len(intel_dossiers)>=2:
             intel,insights=compare_intelligence(intel_dossiers)
             intel_rows=[]
@@ -201,17 +205,9 @@ def render(settings,store):
             st.dataframe(pd.DataFrame([{'Indicator':'Hiring intensity (same-date roles / employees)',**{r['company']:(f"{r['hiring_intensity']['value']:.2%}" if r['hiring_intensity'] else 'Insufficient history') for r in intel}},
                 {'Indicator':'Months since reported funding',**{r['company']:(f"{r['months_since_funding']:.1f}" if r['months_since_funding'] is not None else 'Unknown') for r in intel}},
                 {'Indicator':'Investigation priority / evidence coverage',**{r['company']:str(r['priority']['score'] if r['priority']['score'] is not None else 'Unscored')+' / '+str(r['priority']['coverage'])+'%' for r in intel}}]),hide_index=True,width='stretch')
-            st.markdown('**Short-term trend estimates**')
-            for r in intel:
-                for category in ('workforce','hiring'):
-                    model=r[category]['forecast']
-                    if model:
-                        st.write(r['company']+' · '+category+f": last observation {r[category]['latest']['value']:,.0f} on {r[category]['latest']['date']}; 30-day trend estimate {model['value']:,.1f} on {model['date']}.")
-                        st.caption(model['model']+' · '+model['limitation'])
-                    else: st.caption(r['company']+' · '+category+': Insufficient historical data for statistically defensible forecasting.')
-                st.caption(r['company']+' · 3-month workforce change: '+(f"{r['workforce']['three_month']['value']:.1%}" if r['workforce']['three_month'] and r['workforce']['three_month']['value'] is not None else 'Insufficient history'))
-            for insight in insights: st.write('• '+insight)
-            with st.expander('Sources, evidence references and diligence questions'):
+            from autopsy.decision_insights import render as render_decision_insights
+            render_decision_insights(intel_dossiers,mandate,deals)
+            with st.expander('Developer Diagnostics · source records and calculated indicators'):
                 for r in intel:
                     st.markdown('**'+r['company']+'** · '+str(r['coverage'])+' supported dimensions')
                     st.write('Funding:',r['funding']['value'] if r['funding'] else 'Unknown','USD · historical only · refs:',', '.join(r['funding']['evidence_ids']) if r['funding'] else 'none')
@@ -337,6 +333,7 @@ def render(settings,store):
         except ValueError as exc:
             st.error('Decision evidence validation failed: '+str(exc)); return section
         ctx['war_room']=st.session_state.get('war_outcomes')
+        ctx['operating_model_settings']={'model':st.session_state.get('intelligence_chart_model','Dated linear regression'),'alpha':st.session_state.get('intelligence_alpha',.35),'horizon':st.session_state.get('intelligence_horizon',30)}
         ui.comparison_cards(mandate,deals,dossiers)
         with st.expander('Detailed comparison and sources'):
             comparison(mandate,deals,dossiers)

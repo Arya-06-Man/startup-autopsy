@@ -63,3 +63,19 @@ def test_hiring_intensity_same_dates_and_forecast_guard():
     assert x['hiring_intensity']['value']==pytest.approx(15/130)
     assert x['workforce']['forecast'] is None
     assert set(x['hiring_intensity']['evidence_ids'])<=set(x['evidence_ids'])
+
+
+def test_projection_holdout_and_fit_rules():
+    from autopsy.decision_insights import project,investor_fit
+    from autopsy.mandate import Mandate
+    from tests.test_vcos_finance import deal,dossier as financial_dossier
+    end=date.today()
+    pts=[{'date':(end-timedelta(days=30*(9-i))).isoformat(),'value':100+i*10} for i in range(10)]
+    result=project({'points':pts})
+    assert result['backtest_mae']==pytest.approx(0,abs=1e-9)
+    assert result['projection']['value']==pytest.approx(200)
+    assert project({'points':pts[:3]})['projection'] is None
+    assert project({'points':pts},'EWMA',.2)['projection']['value']!=project({'points':pts},'EWMA',.8)['projection']['value']
+    with pytest.raises(ValueError):project({'points':pts},horizon=365)
+    d=deal(provenance='MODELED ASSUMPTIONS')
+    assert investor_fit(Mandate(capital=100),d,financial_dossier(d))['status']=='Insufficient information to assess'

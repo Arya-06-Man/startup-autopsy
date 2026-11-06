@@ -59,6 +59,17 @@ def export(context,committee=None):
             'limitations':['Company observations are not independently verified unless explicitly labeled.',
             'Financials and documents are user attestations; models are deterministic scenarios, not forecasts.',
             'Conditional allocations are subject to human diligence and approval; no investments executed.']}
+    from autopsy.decision_insights import conclusion,investor_fit,project
+    from autopsy.company_intelligence import analyze
+    ds=[Dossier.model_validate(v) for v in context.get('dossiers',{}).values()]
+    record['operating_conclusion']=conclusion(ds)
+    record['operating_analysis']={}
+    for d in context['deals']:
+        cid=d['terms']['company_id'];raw_dossier=context.get('dossiers',{}).get(cid)
+        if not raw_dossier:continue
+        dossier=Dossier.model_validate(raw_dossier);stats=analyze(dossier)
+        record['operating_analysis'][cid]={'fit':investor_fit(Mandate.model_validate(context['mandate']),Deal.model_validate(d['terms']),dossier),
+            'models':{key:project(stats[key],**context.get('operating_model_settings',{})) for key in ('workforce','hiring')}}
     raw=json.dumps(record,ensure_ascii=False,indent=2,allow_nan=False)
     def fmt(value):
         if value is None: return 'Unknown'
@@ -132,6 +143,9 @@ def export(context,committee=None):
     for raw_dossier in context.get('dossiers',{}).values():
         dossier=Dossier.model_validate(raw_dossier)
         body+='<h2>Company intelligence: '+cell(dossier.name or dossier.query)+'</h2>'+table(['Indicator','Value','Evidence'],report_rows(dossier))
+    body+='<h2>Evidence-Based Comparison Conclusion</h2>'+bullets(record['operating_conclusion'])
+    for cid,analysis in record['operating_analysis'].items():
+        body+='<h3>Investor fit: '+cell(next(d['terms']['name'] for d in context['deals'] if d['terms']['company_id']==cid))+'</h3><p>'+cell(analysis['fit']['status'])+'</p>'+bullets(analysis['fit']['reasons'])
     body+='<h2>Limitations & next action</h2>'+bullets(record['limitations'])
     body+='<p>Resolve the listed approval conditions, reconcile conflicting observations and confirm primary financial and legal records. Recompute after changing terms, assumptions or evidence. No transaction or outreach has been executed.</p>'
     body+='<details><summary>Complete supplied inputs, calculations and source values</summary><pre>'+escape(raw)+'</pre></details>'

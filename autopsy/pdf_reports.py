@@ -116,6 +116,31 @@ class Report:
         drawing.add(String(left,139,'Modeled base cash path ('+currency+', millions)',fontName='VCOS',fontSize=8,fillColor=INK))
         self.story.append(drawing)
 
+    def operating_chart(self,series,model='Dated linear regression',alpha=.35,horizon=30):
+        from autopsy.decision_insights import project
+        result=project(series,model,alpha,horizon)
+        points=result['observed']
+        if len(points)<2:
+            self.para('Historical operating chart unavailable: fewer than two dated observations.','small'); return
+        from datetime import date
+        sets=[(points,ACCENT,False),(result['fitted'],MUTED,False)]
+        if result['projection']: sets.append(([points[-1],result['projection']],colors.HexColor('#b77820'),True))
+        start=date.fromisoformat(points[0]['date']);end=date.fromisoformat(result['projection']['date'] if result['projection'] else points[-1]['date'])
+        values=[p['value'] for rows,_,_ in sets for p in rows];lo=min(values);hi=max(values)
+        chart=Drawing(self.width,150);left,right,bottom,top=42,self.width-15,30,120
+        chart.add(Line(left,bottom,right,bottom,strokeColor=RULE))
+        def xy(p):return left+(right-left)*(date.fromisoformat(p['date'])-start).days/max(1,(end-start).days),bottom+(top-bottom)*(p['value']-lo)/max(1,hi-lo)
+        for rows,color,dashed in sets:
+            for a,b in zip(rows,rows[1:]):
+                line=Line(*xy(a),*xy(b),strokeColor=color,strokeWidth=1.4)
+                if dashed:line.strokeDashArray=[4,3]
+                chart.add(line)
+        for label,y in [(f'{lo:,.0f}',bottom),(f'{hi:,.0f}',top)]:chart.add(String(0,y,label,fontName='VCOS',fontSize=7,fillColor=MUTED))
+        chart.add(String(left,12,start.isoformat(),fontName='VCOS',fontSize=7));chart.add(String(right-70,12,end.isoformat(),fontName='VCOS',fontSize=7))
+        chart.add(String(left,137,'Observed: teal | Fit: gray | Estimate: dashed amber',fontName='VCOS',fontSize=7,fillColor=MUTED))
+        self.story.append(chart)
+        self.para(model+'; '+('holdout MAE '+number(result['backtest_mae']) if result['backtest_mae'] is not None else 'Insufficient history for forecasting or holdout validation.')+' '+result['limitation'],'small')
+
     def build(self):
         if self.character_fallback:
             self.para('Font coverage note: unsupported characters are shown as Unicode code points. The JSON export preserves original text. Configure PDF_FONT_PATH for additional script coverage.','small')
@@ -183,6 +208,18 @@ def committee_pdf(context,committee=None):
         from autopsy.models import Dossier
         if dossier:
             report.para('Company intelligence and operating momentum','h2')
+            from autopsy.company_intelligence import analyze
+            from autopsy.decision_insights import investor_fit
+            from autopsy.mandate import Mandate
+            from autopsy.finance import Deal
+            intelligence=analyze(Dossier.model_validate(dossier))
+            fit=investor_fit(Mandate.model_validate(m),Deal.model_validate(terms),Dossier.model_validate(dossier))
+            report.para('Investor fit: '+fit['status']+'; investment readiness: '+fit['readiness'])
+            report.bullets(fit['reasons'][:5])
+            settings=context.get('operating_model_settings',{})
+            for category in ('workforce','hiring'):
+                report.para(category.title()+' historical operating chart','h2')
+                report.operating_chart(intelligence[category],**settings)
             report.table(['Indicator','Observed / derived value','Evidence references'],report_rows(Dossier.model_validate(dossier)),[1,1.3,1.2])
             report.para('Dated provider observations and historical statistics. Sparse history suppresses forecasts. Funding is historical, never current cash. No return or profitability prediction.','small')
         report.para('Operating evidence','h2')

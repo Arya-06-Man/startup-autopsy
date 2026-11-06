@@ -39,6 +39,16 @@ def test_saved_retool_whatsapp_selection_with_unrelated_context(tmp_path,monkeyp
     table=next(t for t in tables if 'Indicator' in t.columns and 'Retool' in t.columns and 'WhatsApp' in t.columns)
     row=table[table['Indicator']=='Workforce · 3-month'].iloc[0]
     assert row['Retool']=='-1.9%' and row['WhatsApp']=='7.8%'
+    import json
+    chart=json.loads(at.get('plotly_chart')[0].proto.spec)
+    assert chart['data'][0]['name']=='Observed · Crustdata' and len(chart['data'][0]['x'])>1
+    next(w for w in at.selectbox if w.label=='Trend model').set_value('EWMA').run(timeout=30)
+    assert not at.exception
+    assert json.loads(at.get('plotly_chart')[0].proto.spec)!=chart
+    next(w for w in at.selectbox if w.label=='Chart company').set_value('631281').run(timeout=30)
+    assert not at.exception
+    assert any('Evidence-Based Comparison Conclusion' in m.value for m in at.markdown)
+    assert any('Insufficient information to assess' in m.value for m in at.markdown)
     assert not any('No investigated evidence linked' in t.value for t in at.caption)
     assert deal_metrics(deals[0])['ownership']==pytest.approx(1/12)
     assert any('8.33%' in m.value for m in at.metric)
@@ -53,3 +63,21 @@ def test_saved_retool_whatsapp_selection_with_unrelated_context(tmp_path,monkeyp
     assert 'Retool' in text and 'WhatsApp' in text and '8.33%' in text
     assert 'Company intelligence and operating momentum' in text
     assert 'Insufficient history' in text
+
+
+def test_four_saved_company_histories_and_isolated_models():
+    from autopsy.decision_insights import project
+    root=Path(__file__).resolve().parents[1]
+    runs=Store(root/'data').runs()
+    if not runs:pytest.skip('Private saved company evidence is local only')
+    for name in ('Retool','WhatsApp','Stripe','Razorpay'):
+        d=next((d for r in runs for d in r.companies if d.name.casefold()==name.casefold() and d.status=='complete' and d.evidence),None)
+        assert d is not None,name
+        a=analyze(d)
+        for metric in ('workforce','hiring'):
+            model=project(a[metric])
+            assert len(model['observed'])>1
+            assert len(model['fitted'])==len(model['observed'])
+            assert model['backtest_mae'] is not None
+            assert model['backtest_mae']>=0
+            assert set(p['evidence_id'] for p in model['observed'])<=set(e.id for e in d.evidence)
