@@ -89,16 +89,33 @@ def test_search_errors_and_manual_disambiguation(tmp_path,monkeypatch):
 
 
 def test_committee_report_library_all_exports(tmp_path,monkeypatch):
+    from io import BytesIO
+    from pypdf import PdfReader
     at=app(tmp_path,monkeypatch)
     at.radio[0].set_value('Investment Committee').run()
     button(at,'Generate Report').click().run(timeout=30)
     assert not at.exception
     assert at.radio[0].value=='Reports'
-    assert {b.label for b in at.get('download_button')}=={'Download PDF','Print Report','Download HTML','Download Markdown','Export JSON'}
+    assert {b.label for b in at.get('download_button')}=={'Download HTML','Download Markdown','Export JSON'}
     saved=Workspace().list('reports')
     assert len(saved)==1 and len(saved[0]['context']['deals'])==2
     assert any('Report saved '+saved[0]['created_at'] in m.value for m in at.markdown)
     assert not any('Retrieved '+saved[0]['created_at'] in m.value for m in at.markdown)
+    button(at,'Generate PDF').click().run(timeout=30)
+    pdf=at.session_state['generated_pdf_'+at.session_state['report_selection']]
+    assert pdf.startswith(b'%PDF-')
+    reader=PdfReader(BytesIO(pdf))
+    text='\n'.join(page.extract_text() for page in reader.pages)
+    assert saved[0]['companies'][0] in text
+    assert f"{saved[0]['context']['mandate']['capital']:,.2f}" in text
+    assert 'Executive decision summary' in text
+    assert 'SYNTHETIC DEMO DATA' in text
+    assert any(b.label=='Download PDF' for b in at.get('download_button'))
+    assert any(b.label=='Print Report' for b in at.get('download_button'))
+    at.radio[0].set_value('Overview').run()
+    at.radio[0].set_value('Reports').run()
+    assert at.session_state['generated_pdf_'+at.session_state['report_selection']]==pdf
+    assert any(b.label=='Download PDF' for b in at.get('download_button'))
     button(at,'Open Report').click().run()
     assert not at.exception
     at.radio[0].set_value('Overview').run()

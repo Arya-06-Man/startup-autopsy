@@ -32,11 +32,12 @@ def save_committee_report(workspace,context,committee):
         'source_mode':' + '.join(modes) or 'No external evidence','context':context,'committee':committee})
 
 
-def report_controls(artifacts,stem,key):
-    a,b=st.columns([2,1])
-    a.download_button('Download PDF',artifacts['pdf'],stem+'.pdf','application/pdf',type='primary',key=key+'_pdf',width='stretch')
-    b.download_button('Print Report',artifacts['pdf'],stem+'-print.pdf','application/pdf',key=key+'_print',width='stretch')
-    st.caption('Print Report downloads the same A4 PDF. Open it and use your PDF viewer’s Print command. Source links, page numbers and margins are included.')
+def report_controls(artifacts,stem,key,include_pdf=True):
+    if include_pdf:
+        a,b=st.columns([2,1])
+        a.download_button('Download PDF',artifacts['pdf'],stem+'.pdf','application/pdf',type='primary',key=key+'_pdf',width='stretch')
+        b.download_button('Print Report',artifacts['pdf'],stem+'-print.pdf','application/pdf',key=key+'_print',width='stretch')
+        st.caption('Print Report downloads the same A4 PDF. Open it and use your PDF viewer’s Print command.')
     a,b,c=st.columns(3)
     a.download_button('Download HTML',artifacts['html'],stem+'.html','text/html',key=key+'_html',width='stretch')
     b.download_button('Download Markdown',artifacts['md'],stem+'.md','text/markdown',key=key+'_md',width='stretch')
@@ -77,12 +78,24 @@ def reports_page(store,workspace):
     item=next(r for r in options if r['id']==selected)
     with st.container(border=True):
         st.subheader(item['title'])
+        st.markdown('**Companies:** '+item['companies'])
         ui.source_tags(item['mode'],item['date'],timestamp_label='Investigation started' if 'run' in item else 'Report saved')
-        st.caption('Downloads are prepared on demand. The PDF records its creation time; original provider retrieval dates remain in the source register.')
+        st.caption('Selected report · '+item['date']+' · PDF creation time appears inside the downloaded document.')
         st.caption(item['type']+' · '+item['status'])
         try:
-            with st.spinner('Preparing validated report formats'):
-                artifacts=research_artifacts(item['run'].model_dump_json()) if 'run' in item else committee_artifacts(json.dumps({'context':item['record']['context'],'committee':item['record'].get('committee')},sort_keys=True))
-            report_controls(artifacts,'vcos-'+item['id'],item['id'])
+            serialized=item['run'].model_dump_json() if 'run' in item else json.dumps({'context':item['record']['context'],'committee':item['record'].get('committee')},sort_keys=True)
+            artifacts=research_artifacts(serialized) if 'run' in item else committee_artifacts(serialized)
+            pdf_key='generated_pdf_'+item['id']
+            if st.button('Generate PDF',type='primary',key='generate_'+item['id'],width='stretch'):
+                with st.spinner('Validating selected decision and creating print-ready PDF'):
+                    st.session_state[pdf_key]=artifacts['pdf']
+                st.success('PDF generated from this selected saved report.')
+            current_pdf=st.session_state.get(pdf_key)
+            if current_pdf:
+                a,b=st.columns([2,1])
+                a.download_button('Download PDF',current_pdf,'vcos-'+item['id']+'.pdf','application/pdf',type='primary',key='download_'+item['id'],width='stretch')
+                b.download_button('Print Report',current_pdf,'vcos-'+item['id']+'-print.pdf','application/pdf',key='print_'+item['id'],width='stretch')
+                st.caption('Print Report downloads the same A4 PDF. Open it and use your PDF viewer’s Print command.')
+            report_controls(artifacts,'vcos-'+item['id'],item['id'],include_pdf=False)
         except (ValueError,TypeError,KeyError) as exc: st.error('Report validation failed. Downloads are withheld: '+str(exc))
     if st.button('Create investment committee report'): ui.go('Investment Committee')

@@ -155,6 +155,12 @@ def committee_pdf(context,committee=None):
     report.para('No allocation computed.' if total is None else 'Conditional proposed deployment: '+number(total,currency)+'. '+('Current inputs support no new investment.' if total==0 else 'Subject to human diligence and approval.'))
     report.para(context.get('validation_disclosure','Financial figures reflect supplied data or modeled assumptions, not independently verified financial statements.'))
     report.table(['Company','Decision readiness'],[[d['terms']['name'],d['readiness']['status']] for d in deals],[1,2])
+    report.table(['Executive decision summary','Value'],[['Mandate capital',number(m['capital'],currency)],
+        ['Follow-on reserve',number(m['capital']*m['reserve_fraction'],currency)],
+        ['Conditional allocation',number(total,currency) if total is not None else 'Not computed'],
+        ['Decision',('No investment allocated' if total==0 else 'Conditional review' if total else 'Further diligence required')],
+        ['Evidence limitation','Company financial statements remain unknown unless supplied; modeled terms retain their stated provenance.']],[1,2])
+    report.story.append(PageBreak())
     report.section('Investment mandate')
     report.table(['Constraint','Reviewed input'],[['Total portfolio capital',number(m['capital'],currency)],['Risk / horizon',m['risk']+' / '+str(m['horizon_years'])+' years'],
         ['Follow-on reserve',number(m['capital']*m['reserve_fraction'],currency)],['Company / sector / stage limits',f'{m["company_limit"]:.0%} / {m["sector_limit"]:.0%} / {m["stage_limit"]:.0%}'],
