@@ -282,6 +282,18 @@ def company_overview(store,workspace,mandate,deals):
         return
     from autopsy.models import Dossier
     d=Dossier.model_validate(raw); health=company_health(d)
+    from autopsy.company_intelligence import analyze
+    intelligence=analyze(d)
+    with st.container(border=True):
+        st.markdown('**Observed operating momentum** · Investigation signals, not investment predictions')
+        cols=st.columns(4)
+        for col,label,series in [(cols[0],'Workforce',intelligence['workforce']),(cols[1],'Hiring',intelligence['hiring'])]:
+            col.metric(label+' · 6 months',f"{series['six_month']['value']:.1%}" if series['six_month'] and series['six_month']['value'] is not None else 'Unknown')
+            col.caption('EWMA: '+(f"{series['ewma']['value']:.1f}" if series['ewma'] else 'insufficient history'))
+        cols[2].metric('Historical funding',f"USD {intelligence['funding']['value']:,.0f}" if intelligence['funding'] and intelligence['funding']['value'] is not None else 'Unknown')
+        cols[2].caption('Not company cash · '+(', '.join(intelligence['funding']['evidence_ids']) if intelligence['funding'] else 'no funding evidence'))
+        cols[3].metric('Revenue / valuation', 'Unknown')
+        st.caption('OLS trend requires ≥3 dated observations over ≥60 days. Anomaly flag requires ≥5 comparable intervals. No long-horizon forecasts are produced.')
     st.subheader('Executive summary')
     st.write(d.metadata.get('description') or 'A verified business-model description has not been supplied.')
     st.caption(health['verification']+' · '+health['execution']+' execution · '+f'{d.assessment.coverage:g}% scored trend coverage')

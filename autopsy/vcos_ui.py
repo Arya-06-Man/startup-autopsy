@@ -156,6 +156,33 @@ def render(settings,store):
         st.caption('Enter supplied terms in mandate currency. Unknown values stay blank. Financials are annual revenue and current monthly net burn; no company metrics are prefilled.')
         if not mandate:
             ui.empty('Start with an investment mandate.','Review your budget and preferences before configuring deal terms.','Create Investment Mandate','Investment Mandate'); return section
+        from autopsy.company_intelligence import compare as compare_intelligence
+        intel_dossiers=[dossiers.get(cid) for cid in st.session_state.get('evaluation_pool',{})]
+        intel_dossiers=[d for d in intel_dossiers if d]
+        if len(intel_dossiers)<2 and len(dossiers)>=2: intel_dossiers=list(dossiers.values())[:2]
+        st.subheader('Company Intelligence Comparison')
+        if len(intel_dossiers)>=2:
+            intel,insights=compare_intelligence(intel_dossiers)
+            intel_rows=[]
+            for key,label in [('workforce','Workforce'),('hiring','Hiring')]:
+                for metric,title in [('latest','Current'),('mom','Month-over-month'),('three_month','3-month'),('six_month','6-month'),('acceleration','Acceleration'),('anomaly','Anomaly')]:
+                    intel_rows.append({'Indicator':label+' · '+title,**{r['company']:(f"{r[key][metric]['value']:.1%}" if metric in ('mom','three_month','six_month') and r[key][metric] else str(r[key][metric]['value']) if metric=='latest' and r[key][metric] else ('Flagged · robust z '+f"{r[key][metric]['value']:.1f}" if metric=='anomaly' and r[key][metric] and r[key][metric]['flag'] else 'No anomaly' if metric=='anomaly' and r[key][metric] else f"{r[key][metric]['value']:.5f} {r[key][metric]['unit']}" if metric=='acceleration' and r[key][metric] else 'Unknown')) for r in intel}})
+            intel_rows += [{'Indicator':'Historical funding raised · USD',**{r['company']:(f"${r['funding']['value']:,.0f}" if r['funding'] and isinstance(r['funding']['value'],(int,float)) else 'Unknown') for r in intel}},
+                     {'Indicator':'Latest round amount / type / date',**{r['company']:(f"${lr['value']:,.0f} · {lr['round_type'] or 'type unknown'} · {lr['date']}" if (lr:=r['latest_round']) and lr['value'] is not None else 'Unknown') for r in intel}},
+                     {'Indicator':'Reported investors',**{r['company']:str(r['metrics']['latest_round']['investors'] or 'Unknown') for r in intel}},
+                     {'Indicator':'EWMA latest workforce / hiring',**{r['company']:(f"{r['workforce']['ewma']['value']:.1f} / {r['hiring']['ewma']['value']:.1f}" if r['workforce']['ewma'] and r['hiring']['ewma'] else 'Unknown · requires ≥3 dated values') for r in intel}},
+                     {'Indicator':'OLS trend (count/day)',**{r['company']:(f"{r['workforce']['ols_trend']['value']:.3f} / {r['hiring']['ols_trend']['value']:.3f}" if r['workforce']['ols_trend'] and r['hiring']['ols_trend'] else 'Unknown · requires ≥3 values over ≥60 days') for r in intel}},
+                     {'Indicator':'Revenue / valuation / traffic',**{r['company']:'Unknown' for r in intel}},
+                     {'Indicator':'Evidence freshness',**{r['company']:r['freshness'] or 'Unknown' for r in intel}}]
+            st.dataframe(pd.DataFrame(intel_rows),hide_index=True,width='stretch')
+            for insight in insights: st.write('• '+insight)
+            with st.expander('Sources, evidence references and diligence questions'):
+                for r in intel:
+                    st.markdown('**'+r['company']+'** · '+str(r['coverage'])+' supported dimensions')
+                    st.write('Funding:',r['funding']['value'] if r['funding'] else 'Unknown','USD · historical only · refs:',', '.join(r['funding']['evidence_ids']) if r['funding'] else 'none')
+                    st.write('Diligence questions: '+'; '.join(r['questions']))
+                    st.caption('Operating changes are investigation signals, not investment recommendations. Forecasts are suppressed when dated history is insufficient.')
+        else: st.info('Select two investigated companies to compare dated operating and funding evidence. Unsourced values remain Unknown.')
         saved_comparisons=[r for r in workspace.list('comparisons') if r['id']!='active']
         if saved_comparisons:
             with st.expander('Reopen a saved comparison'):
