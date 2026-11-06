@@ -46,3 +46,20 @@ def test_comparative_insights_are_operating_signals_not_winners():
     assert any('stronger observed workforce' in x for x in insights)
     assert any('historical funding does not indicate current cash' in x for x in insights)
     assert any('no winner is selected' in x for x in insights)
+
+
+def test_invalid_future_and_duplicate_dates_excluded():
+    d=dossier('A',[(100,10),(110,12),(130,15)])
+    first=d.evidence[0]
+    d.evidence += [first.model_copy(update={'id':'copy'}),first.model_copy(update={'id':'conflict','value':999}),first.model_copy(update={'id':'future','observation_date':'2099-01-01','value':9999}),first.model_copy(update={'id':'nan','value':float('nan')})]
+    x=analyze(d)
+    assert len(x['workforce']['points'])==2
+    assert x['workforce']['latest']['value']==130
+    assert x['workforce']['forecast'] is None
+
+
+def test_hiring_intensity_same_dates_and_forecast_guard():
+    x=analyze(dossier('A',[(100,10),(110,12),(130,15)]))
+    assert x['hiring_intensity']['value']==pytest.approx(15/130)
+    assert x['workforce']['forecast'] is None
+    assert set(x['hiring_intensity']['evidence_ids'])<=set(x['evidence_ids'])

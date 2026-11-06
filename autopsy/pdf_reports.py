@@ -179,6 +179,12 @@ def committee_pdf(context,committee=None):
             ['Baseline runway (months)',number(metrics['runway_months'])],['Gross / operating margin',number(metrics['gross_margin'],percent=True)+' / '+number(metrics['operating_margin'],percent=True)],
             ['Financial as-of',terms['financial_date'] or 'Unknown']],[1,2])
         report.bullets(metrics['assumptions'])
+        from autopsy.company_intelligence import report_rows
+        from autopsy.models import Dossier
+        if dossier:
+            report.para('Company intelligence and operating momentum','h2')
+            report.table(['Indicator','Observed / derived value','Evidence references'],report_rows(Dossier.model_validate(dossier)),[1,1.3,1.2])
+            report.para('Dated provider observations and historical statistics. Sparse history suppresses forecasts. Funding is historical, never current cash. No return or profitability prediction.','small')
         report.para('Operating evidence','h2')
         signals=dossier.get('assessment',{}).get('signals',[])
         if signals:

@@ -108,6 +108,15 @@ with radar:
     frame=pd.DataFrame([{'Company':d.name or d.query,'Priority':d.assessment.score,'Assessment':d.assessment.label,'Coverage %':d.assessment.coverage,'Response':d.advice.get('urgency','Review identity'),'Status':d.status} for d in ranked])
     st.dataframe(frame,hide_index=True,width='stretch',column_config={'Priority':st.column_config.ProgressColumn(min_value=0,max_value=100,format='%.1f'),'Coverage %':st.column_config.ProgressColumn(min_value=0,max_value=100,format='%.0f%%')})
     st.caption('Blank priority means insufficient evidence. Weights: workforce 35%, leadership 30%, hiring 20%, business 15%. Only supported categories contribute; at least 50% weighted coverage and two comparable categories are required. This MVP scores dated workforce and hiring trends; leadership and business sources require manual verification before scoring.')
+    from autopsy.company_intelligence import analyze
+    for company in companies:
+        with st.expander((company.name or company.query)+' · priority drivers and anomalies'):
+            result=analyze(company)
+            st.dataframe(pd.DataFrame(result['priority']['contributions']),hide_index=True,width='stretch')
+            st.caption('Existing investigation-priority heuristic, not investment attractiveness or probability of failure.')
+            for category in ('workforce','hiring'):
+                anomaly=result[category]['anomaly']
+                st.write(category.title()+' anomaly: '+('Flagged' if anomaly and anomaly['flag'] else 'No anomaly detected' if anomaly else 'Insufficient history'))
     scored=frame.dropna(subset=['Priority'])
     if not scored.empty:
         st.plotly_chart(px.bar(scored,x='Priority',y='Company',orientation='h',range_x=[0,100],color_discrete_sequence=['#58dac2']),width='stretch')

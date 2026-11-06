@@ -128,6 +128,10 @@ def export(context,committee=None):
         [key,value['fact'],value['type'],value.get('observed'),value.get('event'),value.get('published'),value.get('provider_updated'),value.get('retrieved')] for key,value in cited_evidence]) if evidence else '<p>No external evidence supplied; more diligence required.</p>'
     body+='<p>'+str(len(evidence))+' original evidence records retained. Main table shows cited/core observations; the complete source values remain in the expandable audit appendix and JSON export.</p>'
     body+='<details><summary>Source links and retrieval modes</summary><ul>'+''.join('<li>'+cell(key)+' · '+('<a href="'+escape(value.get('source',''),quote=True)+'" rel="noopener noreferrer">'+cell(value.get('source'))+'</a>' if safe_url(value.get('source','')) else cell(value.get('source')))+' · '+cell(value.get('data_mode','Unknown / legacy record'))+'</li>' for key,value in evidence)+'</ul></details>'
+    from autopsy.company_intelligence import report_rows
+    for raw_dossier in context.get('dossiers',{}).values():
+        dossier=Dossier.model_validate(raw_dossier)
+        body+='<h2>Company intelligence: '+cell(dossier.name or dossier.query)+'</h2>'+table(['Indicator','Value','Evidence'],report_rows(dossier))
     body+='<h2>Limitations & next action</h2>'+bullets(record['limitations'])
     body+='<p>Resolve the listed approval conditions, reconcile conflicting observations and confirm primary financial and legal records. Recompute after changing terms, assumptions or evidence. No transaction or outreach has been executed.</p>'
     body+='<details><summary>Complete supplied inputs, calculations and source values</summary><pre>'+escape(raw)+'</pre></details>'

@@ -52,6 +52,13 @@ def render(settings,store):
         run=next(r for r in runs if r.id==run_id)
         dossiers={d.company_id:d for d in run.companies if d.company_id and d.status!='duplicate'}
     else: dossiers={}; run=None
+    # Comparison joins canonical IDs across saved completed investigations, not only the sidebar run.
+    saved_dossiers={}
+    for saved_run in runs:
+        for d in saved_run.companies:
+            if d.company_id and d.status=='complete' and d.evidence: saved_dossiers.setdefault(d.company_id,d)
+    if section in ('Evaluate','Investment Committee','Portfolio Lab'):
+        dossiers=saved_dossiers | {cid:d for cid,d in dossiers.items() if d.status=='complete' and d.evidence}
     if st.session_state.get('replay_dossiers') is not None:
         dossiers={cid:Dossier.model_validate(d) for cid,d in st.session_state['replay_dossiers'].items()}
         st.sidebar.info('Frozen evidence from decision replay')
@@ -156,33 +163,6 @@ def render(settings,store):
         st.caption('Enter supplied terms in mandate currency. Unknown values stay blank. Financials are annual revenue and current monthly net burn; no company metrics are prefilled.')
         if not mandate:
             ui.empty('Start with an investment mandate.','Review your budget and preferences before configuring deal terms.','Create Investment Mandate','Investment Mandate'); return section
-        from autopsy.company_intelligence import compare as compare_intelligence
-        intel_dossiers=[dossiers.get(cid) for cid in st.session_state.get('evaluation_pool',{})]
-        intel_dossiers=[d for d in intel_dossiers if d]
-        if len(intel_dossiers)<2 and len(dossiers)>=2: intel_dossiers=list(dossiers.values())[:2]
-        st.subheader('Company Intelligence Comparison')
-        if len(intel_dossiers)>=2:
-            intel,insights=compare_intelligence(intel_dossiers)
-            intel_rows=[]
-            for key,label in [('workforce','Workforce'),('hiring','Hiring')]:
-                for metric,title in [('latest','Current'),('mom','Month-over-month'),('three_month','3-month'),('six_month','6-month'),('acceleration','Acceleration'),('anomaly','Anomaly')]:
-                    intel_rows.append({'Indicator':label+' · '+title,**{r['company']:(f"{r[key][metric]['value']:.1%}" if metric in ('mom','three_month','six_month') and r[key][metric] else str(r[key][metric]['value']) if metric=='latest' and r[key][metric] else ('Flagged · robust z '+f"{r[key][metric]['value']:.1f}" if metric=='anomaly' and r[key][metric] and r[key][metric]['flag'] else 'No anomaly' if metric=='anomaly' and r[key][metric] else f"{r[key][metric]['value']:.5f} {r[key][metric]['unit']}" if metric=='acceleration' and r[key][metric] else 'Unknown')) for r in intel}})
-            intel_rows += [{'Indicator':'Historical funding raised · USD',**{r['company']:(f"${r['funding']['value']:,.0f}" if r['funding'] and isinstance(r['funding']['value'],(int,float)) else 'Unknown') for r in intel}},
-                     {'Indicator':'Latest round amount / type / date',**{r['company']:(f"${lr['value']:,.0f} · {lr['round_type'] or 'type unknown'} · {lr['date']}" if (lr:=r['latest_round']) and lr['value'] is not None else 'Unknown') for r in intel}},
-                     {'Indicator':'Reported investors',**{r['company']:str(r['metrics']['latest_round']['investors'] or 'Unknown') for r in intel}},
-                     {'Indicator':'EWMA latest workforce / hiring',**{r['company']:(f"{r['workforce']['ewma']['value']:.1f} / {r['hiring']['ewma']['value']:.1f}" if r['workforce']['ewma'] and r['hiring']['ewma'] else 'Unknown · requires ≥3 dated values') for r in intel}},
-                     {'Indicator':'OLS trend (count/day)',**{r['company']:(f"{r['workforce']['ols_trend']['value']:.3f} / {r['hiring']['ols_trend']['value']:.3f}" if r['workforce']['ols_trend'] and r['hiring']['ols_trend'] else 'Unknown · requires ≥3 values over ≥60 days') for r in intel}},
-                     {'Indicator':'Revenue / valuation / traffic',**{r['company']:'Unknown' for r in intel}},
-                     {'Indicator':'Evidence freshness',**{r['company']:r['freshness'] or 'Unknown' for r in intel}}]
-            st.dataframe(pd.DataFrame(intel_rows),hide_index=True,width='stretch')
-            for insight in insights: st.write('• '+insight)
-            with st.expander('Sources, evidence references and diligence questions'):
-                for r in intel:
-                    st.markdown('**'+r['company']+'** · '+str(r['coverage'])+' supported dimensions')
-                    st.write('Funding:',r['funding']['value'] if r['funding'] else 'Unknown','USD · historical only · refs:',', '.join(r['funding']['evidence_ids']) if r['funding'] else 'none')
-                    st.write('Diligence questions: '+'; '.join(r['questions']))
-                    st.caption('Operating changes are investigation signals, not investment recommendations. Forecasts are suppressed when dated history is insufficient.')
-        else: st.info('Select two investigated companies to compare dated operating and funding evidence. Unsourced values remain Unknown.')
         saved_comparisons=[r for r in workspace.list('comparisons') if r['id']!='active']
         if saved_comparisons:
             with st.expander('Reopen a saved comparison'):
@@ -199,6 +179,46 @@ def render(settings,store):
         options=list(available)
         defaults=list(dict.fromkeys([d.company_id for d in deals if d.company_id in options]+list(pool)))[:5]
         selected=st.multiselect('Companies from evidence context',options,default=defaults,format_func=lambda cid:available[cid].name or available[cid].query,max_selections=5)
+        from autopsy.company_intelligence import compare as compare_intelligence
+        intel_dossiers=[dossiers.get(cid) for cid in selected]
+        intel_dossiers=[d for d in intel_dossiers if d]
+        st.subheader('COMPANY INTELLIGENCE & OPERATING MOMENTUM')
+        st.caption('Company Intelligence Comparison · Selected canonical company IDs: '+', '.join(selected))
+        if len(intel_dossiers)>=2:
+            intel,insights=compare_intelligence(intel_dossiers)
+            intel_rows=[]
+            for key,label in [('workforce','Workforce'),('hiring','Hiring')]:
+                for metric,title in [('latest','Current'),('mom','Month-over-month'),('three_month','3-month'),('six_month','6-month'),('acceleration','Acceleration'),('anomaly','Anomaly')]:
+                    intel_rows.append({'Indicator':label+' · '+title,**{r['company']:(f"{r[key][metric]['value']:.1%}" if metric in ('mom','three_month','six_month') and r[key][metric] else str(r[key][metric]['value']) if metric=='latest' and r[key][metric] else ('Flagged · robust z '+f"{r[key][metric]['value']:.1f}" if metric=='anomaly' and r[key][metric] and r[key][metric]['flag'] else 'No anomaly' if metric=='anomaly' and r[key][metric] else f"{r[key][metric]['value']:.5f} {r[key][metric]['unit']}" if metric=='acceleration' and r[key][metric] else 'Unknown')) for r in intel}})
+            intel_rows += [{'Indicator':'Historical funding raised · USD',**{r['company']:(f"${r['funding']['value']:,.0f}" if r['funding'] and isinstance(r['funding']['value'],(int,float)) else 'Unknown') for r in intel}},
+                     {'Indicator':'Latest round amount / type / date',**{r['company']:(f"${lr['value']:,.0f} · {lr['round_type'] or 'type unknown'} · {lr['date']}" if (lr:=r['latest_round']) and lr['value'] is not None else 'Unknown') for r in intel}},
+                     {'Indicator':'Reported investors',**{r['company']:str(r['metrics']['latest_round']['investors'] or 'Unknown') for r in intel}},
+                     {'Indicator':'EWMA latest workforce / hiring',**{r['company']:(f"{r['workforce']['ewma']['value']:.1f} / {r['hiring']['ewma']['value']:.1f}" if r['workforce']['ewma'] and r['hiring']['ewma'] else 'Unknown · requires ≥3 dated values') for r in intel}},
+                     {'Indicator':'OLS trend (count/day)',**{r['company']:(f"{r['workforce']['ols_trend']['value']:.3f} / {r['hiring']['ols_trend']['value']:.3f}" if r['workforce']['ols_trend'] and r['hiring']['ols_trend'] else 'Unknown · requires ≥3 values over ≥60 days') for r in intel}},
+                     {'Indicator':'Revenue / valuation / traffic',**{r['company']:'Unknown' for r in intel}},
+                     {'Indicator':'Evidence freshness',**{r['company']:r['freshness'] or 'Unknown' for r in intel}}]
+            st.dataframe(pd.DataFrame(intel_rows),hide_index=True,width='stretch')
+            st.dataframe(pd.DataFrame([{'Indicator':'Hiring intensity (same-date roles / employees)',**{r['company']:(f"{r['hiring_intensity']['value']:.2%}" if r['hiring_intensity'] else 'Insufficient history') for r in intel}},
+                {'Indicator':'Months since reported funding',**{r['company']:(f"{r['months_since_funding']:.1f}" if r['months_since_funding'] is not None else 'Unknown') for r in intel}},
+                {'Indicator':'Investigation priority / evidence coverage',**{r['company']:str(r['priority']['score'] if r['priority']['score'] is not None else 'Unscored')+' / '+str(r['priority']['coverage'])+'%' for r in intel}}]),hide_index=True,width='stretch')
+            st.markdown('**Short-term trend estimates**')
+            for r in intel:
+                for category in ('workforce','hiring'):
+                    model=r[category]['forecast']
+                    if model:
+                        st.write(r['company']+' · '+category+f": last observation {r[category]['latest']['value']:,.0f} on {r[category]['latest']['date']}; 30-day trend estimate {model['value']:,.1f} on {model['date']}.")
+                        st.caption(model['model']+' · '+model['limitation'])
+                    else: st.caption(r['company']+' · '+category+': Insufficient historical data for statistically defensible forecasting.')
+                st.caption(r['company']+' · 3-month workforce change: '+(f"{r['workforce']['three_month']['value']:.1%}" if r['workforce']['three_month'] and r['workforce']['three_month']['value'] is not None else 'Insufficient history'))
+            for insight in insights: st.write('• '+insight)
+            with st.expander('Sources, evidence references and diligence questions'):
+                for r in intel:
+                    st.markdown('**'+r['company']+'** · '+str(r['coverage'])+' supported dimensions')
+                    st.write('Funding:',r['funding']['value'] if r['funding'] else 'Unknown','USD · historical only · refs:',', '.join(r['funding']['evidence_ids']) if r['funding'] else 'none')
+                    st.json({'workforce':r['workforce'],'hiring':r['hiring'],'priority':r['priority']},expanded=False)
+                    st.write('Diligence questions: '+'; '.join(r['questions']))
+                    st.caption('Operating changes are investigation signals, not investment recommendations. Forecasts are suppressed when dated history is insufficient.')
+        else: st.info('Select two investigated companies to compare dated operating and funding evidence. Unsourced values remain Unknown.')
         if pool and any(cid not in dossiers for cid in selected):
             st.info('Discovery candidates are selected for evaluation. Launch their dossier investigations in Discover before an allocation can become reviewable.')
             if st.button('Investigate evaluation candidates'):
@@ -216,7 +236,7 @@ def render(settings,store):
                 'valuation_basis':'pre-money','round_size':None,'instrument':'Ordinary equity','cash':None,
                 'monthly_burn':None,'revenue':None,'financial_date':None,'documents':[],
                 'rejection_reviewed':False,'downside_moic':None,'base_moic':None,'upside_moic':None}))
-        ui.comparison_cards(mandate,deals,dossiers)
+        ui.comparison_cards(mandate,[d for d in deals if d.company_id in selected],dossiers)
         if not ids:
             ui.empty('Choose two companies to compare.','Search for companies, add them to comparison, then edit their terms here.','Search Companies','Company Search')
         if ids:
